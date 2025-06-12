@@ -51,14 +51,15 @@ class CsvDataProcessor {
         sourceStream: InputStream,
         destinationStream: OutputStream,
         rowsToAdd: Int,
-        incrementStep: Long, // NEW: The fixed amount to increment by
+        dateIncrementStep: Long,      // NEW: Specific step for dates/times
+        numberIncrementStep: Long,    // NEW: Specific step for numbers
         targetColumnNames: List<String>,
         uuidColumnNames: Set<String>,
         generateFromFirstRowOnly: Boolean,
         timestampIncrementMode: TimestampIncrementMode
     ): Result<Long> {
         var totalRowsWritten = 0L
-        Log.d(TAG, "Starting CSV STREAMING process. Increment Step: $incrementStep, Timestamp Mode: $timestampIncrementMode")
+        Log.d(TAG, "Starting CSV STREAMING. Date Step: $dateIncrementStep, Number Step: $numberIncrementStep")
 
         try {
             csvReader().open(sourceStream) {
@@ -80,7 +81,7 @@ class CsvDataProcessor {
                             writeRow(firstDataRow)
                             totalRowsWritten++
                             for (i in 1..rowsToAdd) {
-                                val newRow = createNewRow(firstDataRow, i, incrementStep, uuidColumnIndices, targetColumnsForIncrementIndices, timestampIncrementMode)
+                                val newRow = createNewRow(firstDataRow, i, dateIncrementStep, numberIncrementStep, uuidColumnIndices, targetColumnsForIncrementIndices, timestampIncrementMode)
                                 writeRow(newRow)
                                 totalRowsWritten++
                             }
@@ -92,7 +93,7 @@ class CsvDataProcessor {
                             writeRow(currentRow)
                             totalRowsWritten++
                             for (i in 1..rowsToAdd) {
-                                val newRow = createNewRow(currentRow, i, incrementStep, uuidColumnIndices, targetColumnsForIncrementIndices, timestampIncrementMode)
+                                val newRow = createNewRow(currentRow, i, dateIncrementStep, numberIncrementStep, uuidColumnIndices, targetColumnsForIncrementIndices, timestampIncrementMode)
                                 writeRow(newRow)
                                 totalRowsWritten++
                             }
@@ -114,8 +115,9 @@ class CsvDataProcessor {
 
     private fun createNewRow(
         templateRow: List<String>,
-        iteration: Int, // The current loop number (1, 2, 3...)
-        incrementStep: Long, // NEW: The fixed amount to add
+        iteration: Int,
+        dateIncrementStep: Long,
+        numberIncrementStep: Long,
         uuidColumnIndices: Map<Int, String>,
         targetColumnsForIncrementIndices: List<Pair<String, Int>>,
         timestampIncrementMode: TimestampIncrementMode
@@ -130,9 +132,9 @@ class CsvDataProcessor {
 
         targetColumnsForIncrementIndices.forEach { (_, targetIndex) ->
             if (!uuidColumnIndices.containsKey(targetIndex) && newRow.size > targetIndex) {
-                // We multiply the fixed step by the current iteration to get a cumulative increment
-                val cumulativeIncrement = incrementStep * iteration
-                newRow[targetIndex] = incrementValue(templateRow[targetIndex], cumulativeIncrement, timestampIncrementMode)
+                val cumulativeDateIncrement = dateIncrementStep * iteration
+                val cumulativeNumberIncrement = numberIncrementStep * iteration
+                newRow[targetIndex] = incrementValue(templateRow[targetIndex], cumulativeDateIncrement, cumulativeNumberIncrement, timestampIncrementMode)
             }
         }
         return newRow
@@ -140,31 +142,28 @@ class CsvDataProcessor {
 
     private fun incrementValue(
         value: String,
-        cumulativeIncrement: Long,
+        cumulativeDateIncrement: Long,
+        cumulativeNumberIncrement: Long,
         timestampIncrementMode: TimestampIncrementMode
     ): String {
         val trimmedValue = value.trim()
 
-        // 1. Try to parse as a full ZonedDateTime (e.g., 2025-06-09T11:08:17.000Z)
+        // 1. Try to parse as a full ZonedDateTime
         try {
-            // Using the default ZonedDateTime parser which is more flexible for standard ISO formats
             val zonedDateTime = ZonedDateTime.parse(trimmedValue)
             val newDateTime = when (timestampIncrementMode) {
-                TimestampIncrementMode.DAY_ONLY -> zonedDateTime.plusDays(cumulativeIncrement)
-                TimestampIncrementMode.TIME_ONLY -> zonedDateTime.plusSeconds(cumulativeIncrement)
-                TimestampIncrementMode.DAY_AND_TIME -> zonedDateTime.plusDays(cumulativeIncrement).plusSeconds(cumulativeIncrement)
+                TimestampIncrementMode.DAY_ONLY -> zonedDateTime.plusDays(cumulativeDateIncrement)
+                TimestampIncrementMode.TIME_ONLY -> zonedDateTime.plusSeconds(cumulativeDateIncrement)
+                TimestampIncrementMode.DAY_AND_TIME -> zonedDateTime.plusDays(cumulativeDateIncrement).plusSeconds(cumulativeDateIncrement)
             }
-            // Format back to the specific ISO_INSTANT format to preserve the '.000Z'
             return newDateTime.format(DateTimeFormatter.ISO_INSTANT)
-        } catch (e: DateTimeParseException) {
-            // Not a ZonedDateTime, proceed to the next check
-        }
+        } catch (e: DateTimeParseException) { /* Not a ZonedDateTime */ }
 
-        // 2. Try to parse as a simple Date (e.g., yyyy-MM-dd)
+        // 2. Try to parse as a simple Date
         for ((_, formatter) in datePatternFormatters) {
             try {
                 val date = LocalDate.parse(trimmedValue, formatter)
-                return date.plusDays(cumulativeIncrement).format(formatter)
+                return date.plusDays(cumulativeDateIncrement).format(formatter)
             } catch (e: DateTimeParseException) { /* Try next */ }
         }
 
@@ -176,7 +175,7 @@ class CsvDataProcessor {
             if (number != null) {
                 val prefix = matchResult.groupValues[1]
                 val numberPart = matchResult.groupValues[2]
-                val newNumber = number + cumulativeIncrement
+                val newNumber = number + cumulativeNumberIncrement
                 return prefix + newNumber.toString().padStart(numberPart.length, '0')
             }
         }
