@@ -12,7 +12,6 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.UUID
-import java.util.concurrent.ThreadLocalRandom
 import kotlin.random.Random
 
 // Enum to represent the user's choice for timestamp incrementing
@@ -34,16 +33,18 @@ class CsvDataProcessor {
         "yyyy-MM-dd" to DateTimeFormatter.ofPattern("yyyy-MM-dd")
     )
 
+    // private val ALPHANUMERIC_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // Reverted change, no longer needed
+
     /**
-     * NEW: Counts the number of data rows in a CSV file.
+     * Counts the number of data rows in a CSV file.
      */
     fun countRows(sourceStream: InputStream): Result<Int> {
         var rowCount = 0
         return try {
             csvReader().open(sourceStream) {
-                // Subtract 1 for the header if it exists, so we only count data rows
+                // Skip header, handle empty file
                 if (readNext() == null) {
-                    return@open // Empty file
+                    return@open
                 }
                 while(readNext() != null) {
                     rowCount++
@@ -84,10 +85,10 @@ class CsvDataProcessor {
         randomizeColumnNames: Set<String>,
         generateFromFirstRowOnly: Boolean,
         timestampIncrementMode: TimestampIncrementMode,
-        onProgress: (Int) -> Unit // NEW: Callback to report progress
+        onProgress: (Int) -> Unit
     ): Result<Long> {
         var totalRowsWritten = 0L
-        Log.d(TAG, "Starting CSV STREAMING. Randomize Columns: ${randomizeColumnNames.joinToString()}")
+        Log.d(TAG, "Starting CSV STREAMING. Date Step: $dateIncrementStep, Number Step: $numberIncrementStep")
 
         try {
             csvReader().open(sourceStream) {
@@ -106,7 +107,7 @@ class CsvDataProcessor {
                             writeRow(firstDataRow)
                             totalRowsWritten++
                             for (i in 1..rowsToAdd) {
-                                onProgress(i) // Report progress based on generated rows
+                                onProgress(i)
                                 val newRow = createNewRow(firstDataRow, i, dateIncrementStep, numberIncrementStep, incrementIndices, uuidIndices, randomizeIndices, timestampIncrementMode)
                                 writeRow(newRow)
                                 totalRowsWritten++
@@ -117,7 +118,7 @@ class CsvDataProcessor {
                         var originalRowIndex = 0
                         while (originalRow != null) {
                             originalRowIndex++
-                            onProgress(originalRowIndex) // Report progress based on processed source rows
+                            onProgress(originalRowIndex)
                             val currentRow = originalRow
                             writeRow(currentRow)
                             totalRowsWritten++
@@ -170,31 +171,53 @@ class CsvDataProcessor {
 
     private fun randomizeValue(originalValue: String): String {
         val trimmedValue = originalValue.trim()
+        Log.d(RANDOM_TAG, "Attempting to randomize value: '$trimmedValue'")
+
+        // Try boolean
         if (trimmedValue.equals("true", ignoreCase = true) || trimmedValue.equals("false", ignoreCase = true)) {
-            return Random.nextBoolean().toString()
+            val randomBool = Random.nextBoolean().toString()
+            Log.d(RANDOM_TAG, "BOOLEAN detected. New random value: $randomBool")
+            return randomBool
         }
+
+        // Try ZonedDateTime
         try {
             val originalDate = ZonedDateTime.parse(trimmedValue)
-            val randomDays = ThreadLocalRandom.current().nextLong(-365, 366)
-            val randomSeconds = ThreadLocalRandom.current().nextLong(-86400, 86401)
-            return originalDate.plusDays(randomDays).plusSeconds(randomSeconds).format(DateTimeFormatter.ISO_INSTANT)
+            val randomDays = Random.Default.nextLong(-365, 366)
+            val randomSeconds = Random.Default.nextLong(-86400, 86401)
+            val newDateTime = originalDate.plusDays(randomDays).plusSeconds(randomSeconds)
+            val formatted = newDateTime.format(DateTimeFormatter.ISO_INSTANT)
+            Log.d(RANDOM_TAG, "TIMESTAMP detected. New random value: $formatted")
+            return formatted
         } catch (e: DateTimeParseException) { /* Not a timestamp */ }
+
+        // Try simple Date
         for ((_, formatter) in datePatternFormatters) {
             try {
                 val originalDate = LocalDate.parse(trimmedValue, formatter)
-                val randomDays = ThreadLocalRandom.current().nextLong(-365, 366)
-                return originalDate.plusDays(randomDays).format(formatter)
+                val randomDays = Random.Default.nextLong(-365, 366)
+                val newDate = originalDate.plusDays(randomDays)
+                val formatted = newDate.format(formatter)
+                Log.d(RANDOM_TAG, "DATE detected. New random value: $formatted")
+                return formatted
             } catch (e: DateTimeParseException) { /* Try next */ }
         }
+
+        // REVERTED to PREFIXNUMBER randomization logic.
         val regex = Regex("^(.*?)(\\d+)$")
         val matchResult = regex.matchEntire(trimmedValue)
         if (matchResult != null) {
             val prefix = matchResult.groupValues[1]
             val numberPart = matchResult.groupValues[2]
             val maxRandom = "9".repeat(numberPart.length).toLongOrNull() ?: Long.MAX_VALUE
-            val randomNumber = ThreadLocalRandom.current().nextLong(0, maxRandom + 1)
-            return prefix + randomNumber.toString().padStart(numberPart.length, '0')
+            // Use Kotlin's default Random generator
+            val randomNumber = Random.Default.nextLong(0, maxRandom + 1)
+            val randomString = randomNumber.toString().padStart(numberPart.length, '0')
+            Log.d(RANDOM_TAG, "PREFIXNUMBER detected. New random value: ${prefix}${randomString}")
+            return prefix + randomString
         }
+
+        Log.d(RANDOM_TAG, "No specific format detected. Returning original value.")
         return originalValue
     }
 
@@ -205,6 +228,7 @@ class CsvDataProcessor {
         timestampIncrementMode: TimestampIncrementMode
     ): String {
         val trimmedValue = value.trim()
+
         try {
             val zonedDateTime = ZonedDateTime.parse(trimmedValue)
             val newDateTime = when (timestampIncrementMode) {
@@ -214,12 +238,14 @@ class CsvDataProcessor {
             }
             return newDateTime.format(DateTimeFormatter.ISO_INSTANT)
         } catch (e: DateTimeParseException) { /* Not a ZonedDateTime */ }
+
         for ((_, formatter) in datePatternFormatters) {
             try {
                 val date = LocalDate.parse(trimmedValue, formatter)
                 return date.plusDays(cumulativeDateIncrement).format(formatter)
             } catch (e: DateTimeParseException) { /* Try next */ }
         }
+
         val regex = Regex("^(.*?)(\\d+)$")
         val matchResult = regex.matchEntire(trimmedValue)
         if (matchResult != null) {
@@ -231,6 +257,7 @@ class CsvDataProcessor {
                 return prefix + newNumber.toString().padStart(numberPart.length, '0')
             }
         }
+
         return trimmedValue
     }
 }
