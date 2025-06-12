@@ -1,5 +1,6 @@
 package com.example.csvmodifier.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
@@ -25,6 +26,10 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     private val _progressText = MutableLiveData<String>()
     val progressText: LiveData<String> get() = _progressText
 
+    // NEW: LiveData to hold the URI of the last saved file for sharing
+    private val _lastSavedFileUri = MutableLiveData<Uri?>()
+    val lastSavedFileUri: LiveData<Uri?> get() = _lastSavedFileUri
+
     val selectedFileName: LiveData<String?> = savedStateHandle.getLiveData<String?>("selectedFileNameKey")
     private val _csvHeaders = MutableLiveData<List<String>?>(null)
     val csvHeaders: LiveData<List<String>?> get() = _csvHeaders
@@ -49,6 +54,11 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         _progressText.postValue(text)
     }
 
+    // NEW: Function to set the URI of the last saved file
+    fun setLastSavedFile(uri: Uri?) {
+        _lastSavedFileUri.postValue(uri)
+    }
+
     fun setSelectedFile(fileName: String?) {
         savedStateHandle["selectedFileNameKey"] = fileName
         if (fileName == null) {
@@ -56,6 +66,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
             _selectedTargetColumns.value = emptySet()
             _selectedUuidColumns.value = emptySet()
             _selectedRandomizeColumns.value = emptySet()
+            _lastSavedFileUri.value = null // Clear last saved file when new source is picked
         }
     }
 
@@ -71,6 +82,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         _selectedTargetColumns.value = emptySet()
         _selectedUuidColumns.value = emptySet()
         _selectedRandomizeColumns.value = emptySet()
+        _lastSavedFileUri.value = null // Clear last saved file
 
         viewModelScope.launch {
             try {

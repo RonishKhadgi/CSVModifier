@@ -241,15 +241,29 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
 
+                <!-- Share Button -->
+                <Button
+                    android:id="@+id/buttonShare"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Share Last Saved File"
+                    app:icon="@android:drawable/ic_menu_share"
+                    android:visibility="@{viewModel.lastSavedFileUri != null ? View.VISIBLE : View.GONE}"
+                    app:layout_constraintTop_toBottomOf="@id/buttonProcessAndSave"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
                 <!-- Status Display -->
                 <TextView
                     android:id="@+id/textViewStatus"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="8dp"
                     android:text="@{viewModel.processingStatus}"
                     android:gravity="center"
-                    app:layout_constraintTop_toBottomOf="@id/buttonProcessAndSave"
+                    app:layout_constraintTop_toBottomOf="@id/buttonShare"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
 

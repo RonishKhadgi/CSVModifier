@@ -1,6 +1,7 @@
 package com.example.csvmodifier.view
 
 import android.app.Dialog
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -12,8 +13,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.lifecycleScope
+// import com.example.csvmodifier.BuildConfig // This import is no longer needed
 import com.example.csvmodifier.R
 import com.example.csvmodifier.databinding.ActivityOptionsBinding
 import com.example.csvmodifier.model.TimestampIncrementMode
@@ -21,12 +24,11 @@ import com.example.csvmodifier.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class OptionsActivity : AppCompatActivity() {
 
@@ -47,6 +49,7 @@ class OptionsActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { destinationUri: Uri? ->
             if (destinationUri == null) {
                 viewModel.setProcessingStatus("Save cancelled.")
+                viewModel.setLastSavedFile(null) // Clear last saved URI
                 return@registerForActivityResult
             }
             if (sourceFileUri == null) {
@@ -113,6 +116,11 @@ class OptionsActivity : AppCompatActivity() {
             val suggestedName = viewModel.selectedFileName.value?.let { "processed_$it" } ?: "processed_output.csv"
             fileSaverLauncher.launch(suggestedName)
         }
+        binding.buttonShare.setOnClickListener {
+            viewModel.lastSavedFileUri.value?.let { uri ->
+                shareFile(uri)
+            } ?: Toast.makeText(this, "No saved file to share.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun gatherOptionsAndProcess(sourceUri: Uri, destUri: Uri) {
@@ -159,9 +167,10 @@ class OptionsActivity : AppCompatActivity() {
     ) {
         showLoadingDialog()
         viewModel.setProcessingStatus("Preparing...")
+        viewModel.setLastSavedFile(null) // Clear previous saved file URI
 
         lifecycleScope.launch {
-            val totalRowsResult = withContext(Dispatchers.IO) {
+            val totalRowsResult: Result<Int> = withContext(Dispatchers.IO) {
                 try {
                     val countStream = contentResolver.openInputStream(sourceUri) ?: throw IOException("Failed to open file for counting.")
                     viewModel.processor.countRows(countStream)
@@ -179,7 +188,7 @@ class OptionsActivity : AppCompatActivity() {
             val totalSourceRows = totalRowsResult.getOrDefault(0)
             viewModel.setProcessingStatus("Processing...")
 
-            val result = withContext(Dispatchers.IO) {
+            val result: Result<Long> = withContext(Dispatchers.IO) {
                 try {
                     val sourceStream = contentResolver.openInputStream(sourceUri) ?: throw IOException("Failed to open file for processing.")
                     val destStream = contentResolver.openOutputStream(destUri) ?: throw IOException("Failed to open destination file.")
@@ -203,10 +212,12 @@ class OptionsActivity : AppCompatActivity() {
             result.fold(
                 onSuccess = { rowsWritten ->
                     viewModel.setProcessingStatus("Success! Wrote $rowsWritten rows to the new file.")
+                    viewModel.setLastSavedFile(destUri) // Set the URI on success
                     Toast.makeText(this@OptionsActivity, "Processing complete!", Toast.LENGTH_LONG).show()
                 },
                 onFailure = { error ->
                     viewModel.setErrorMessage("Processing failed: ${error.message}")
+                    viewModel.setLastSavedFile(null) // Clear on failure
                 }
             )
         }
@@ -247,6 +258,39 @@ class OptionsActivity : AppCompatActivity() {
 
     private fun hideLoadingDialog() {
         loadingDialog?.dismiss()
+    }
+
+    // This function is no longer needed as the robust shareFileViaCache is the primary method.
+    // private fun shareFile(fileUri: Uri) { ... }
+
+    private fun shareFile(fileUri: Uri) { // Renamed from shareFileViaCache for simplicity
+        try {
+            val inputStream = contentResolver.openInputStream(fileUri)
+            // Use a file name that includes the original name to avoid conflicts
+            val originalFileName = viewModel.selectedFileName.value ?: "shared_file.csv"
+            val tempFile = File(cacheDir, originalFileName)
+            val outputStream = FileOutputStream(tempFile)
+
+            inputStream?.copyTo(outputStream)
+            inputStream?.close()
+            outputStream.close()
+
+            val shareUri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.provider", // Using applicationContext.packageName is more robust
+                tempFile
+            )
+
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_STREAM, shareUri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(shareIntent, "Share CSV File"))
+        } catch (ex: Exception) {
+            Log.e(TAG, "Error sharing file via cache", ex)
+            Toast.makeText(this, "Failed to share file: ${ex.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun setupObservers() {
