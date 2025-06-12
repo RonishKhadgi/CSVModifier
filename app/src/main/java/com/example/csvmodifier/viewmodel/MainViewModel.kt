@@ -22,21 +22,18 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     private val _errorMessage = MutableLiveData<String?>()
     val errorMessage: LiveData<String?> get() = _errorMessage
 
-    val selectedFileName: LiveData<String?> = savedStateHandle.getLiveData<String?>("selectedFileNameKey")
+    private val _progressText = MutableLiveData<String>()
+    val progressText: LiveData<String> get() = _progressText
 
+    val selectedFileName: LiveData<String?> = savedStateHandle.getLiveData<String?>("selectedFileNameKey")
     private val _csvHeaders = MutableLiveData<List<String>?>(null)
     val csvHeaders: LiveData<List<String>?> get() = _csvHeaders
-
     private val _isLoadingHeaders = MutableLiveData<Boolean>(false)
     val isLoadingHeaders: LiveData<Boolean> get() = _isLoadingHeaders
-
     private val _selectedTargetColumns = MutableLiveData<Set<String>>(emptySet())
     val selectedTargetColumns: LiveData<Set<String>> get() = _selectedTargetColumns
-
     private val _selectedUuidColumns = MutableLiveData<Set<String>>(emptySet())
     val selectedUuidColumns: LiveData<Set<String>> get() = _selectedUuidColumns
-
-    // NEW: LiveData for randomize columns
     private val _selectedRandomizeColumns = MutableLiveData<Set<String>>(emptySet())
     val selectedRandomizeColumns: LiveData<Set<String>> get() = _selectedRandomizeColumns
 
@@ -46,6 +43,10 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
 
     fun setErrorMessage(message: String?) {
         _errorMessage.postValue(message)
+    }
+
+    fun updateProgress(text: String) {
+        _progressText.postValue(text)
     }
 
     fun setSelectedFile(fileName: String?) {
@@ -77,10 +78,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
                     processor.readCsvHeader(inputStream)
                 }
                 headerResult.fold(
-                    onSuccess = { headers ->
-                        // Sort the headers alphabetically before setting the LiveData value
-                        _csvHeaders.value = headers.sorted()
-                    },
+                    onSuccess = { headers -> _csvHeaders.value = headers.sorted() },
                     onFailure = { error ->
                         _csvHeaders.value = null
                         _errorMessage.value = "Error reading CSV headers: ${error.message}"
@@ -92,19 +90,8 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         }
     }
 
-    fun updateSelectedTargetColumns(newSelection: Set<String>) {
-        _selectedTargetColumns.value = newSelection
-    }
-
-    fun updateSelectedUuidColumns(newSelection: Set<String>) {
-        _selectedUuidColumns.value = newSelection
-    }
-
-    fun updateSelectedRandomizeColumns(newSelection: Set<String>) { // NEW
-        _selectedRandomizeColumns.value = newSelection
-    }
-
-    fun clearErrorMessage() {
-        _errorMessage.value = null
-    }
+    fun updateSelectedTargetColumns(newSelection: Set<String>) { _selectedTargetColumns.value = newSelection }
+    fun updateSelectedUuidColumns(newSelection: Set<String>) { _selectedUuidColumns.value = newSelection }
+    fun updateSelectedRandomizeColumns(newSelection: Set<String>) { _selectedRandomizeColumns.value = newSelection }
+    fun clearErrorMessage() { _errorMessage.value = null }
 }

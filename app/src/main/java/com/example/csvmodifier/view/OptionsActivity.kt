@@ -1,9 +1,12 @@
 package com.example.csvmodifier.view
 
+import android.app.Dialog
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
+import android.view.LayoutInflater
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -12,7 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.lifecycleScope
 import com.example.csvmodifier.R
-import com.example.csvmodifier.databinding.ActivityOptionsBinding // NOTE: This will be generated from activity_options.xml
+import com.example.csvmodifier.databinding.ActivityOptionsBinding
 import com.example.csvmodifier.model.TimestampIncrementMode
 import com.example.csvmodifier.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +34,9 @@ class OptionsActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
     private var sourceFileUri: Uri? = null
 
+    private var loadingDialog: Dialog? = null
+    private var progressTextView: TextView? = null
+
     private val TAG = "OptionsActivity"
 
     companion object {
@@ -47,8 +53,6 @@ class OptionsActivity : AppCompatActivity() {
                 viewModel.setErrorMessage("Source file URI is missing.")
                 return@registerForActivityResult
             }
-
-            // Gather all options and start processing
             gatherOptionsAndProcess(sourceFileUri!!, destinationUri)
         }
 
@@ -59,19 +63,17 @@ class OptionsActivity : AppCompatActivity() {
         binding.viewModel = viewModel
 
         setSupportActionBar(binding.toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true) // Add back button
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         val uriString = intent.getStringExtra(EXTRA_FILE_URI)
         if (uriString == null) {
             Toast.makeText(this, "Error: No file URI provided.", Toast.LENGTH_LONG).show()
-            finish() // Close activity if no file is provided
+            finish()
             return
         }
         sourceFileUri = Uri.parse(uriString)
 
-        // Load file name and headers
         loadInitialFileInfo(sourceFileUri!!)
-
         setupUIListeners()
         setupObservers()
     }
@@ -90,9 +92,7 @@ class OptionsActivity : AppCompatActivity() {
                     fileNameFromPicker = if (nameIndex != -1) cursor.getString(nameIndex) else null
                 }
             }
-            val finalFileName = fileNameFromPicker ?: uri.lastPathSegment ?: "Selected_File.csv"
-            viewModel.setSelectedFile(finalFileName)
-
+            viewModel.setSelectedFile(fileNameFromPicker ?: uri.lastPathSegment ?: "Selected_File.csv")
             viewModel.loadCsvHeaders { contentResolver.openInputStream(uri) }
         } catch (e: Exception) {
             viewModel.setErrorMessage("Error loading file info: ${e.message}")
@@ -101,19 +101,13 @@ class OptionsActivity : AppCompatActivity() {
 
     private fun setupUIListeners() {
         binding.buttonSelectTargetColumns.setOnClickListener {
-            showColumnSelectionDialog("Select Columns for Increment/Date", viewModel.selectedTargetColumns.value ?: emptySet()) {
-                viewModel.updateSelectedTargetColumns(it)
-            }
+            showColumnSelectionDialog("Select Columns for Increment/Date", viewModel.selectedTargetColumns.value ?: emptySet()) { viewModel.updateSelectedTargetColumns(it) }
         }
         binding.buttonSelectRandomizeColumns.setOnClickListener {
-            showColumnSelectionDialog("Select Columns to Randomize", viewModel.selectedRandomizeColumns.value ?: emptySet()) {
-                viewModel.updateSelectedRandomizeColumns(it)
-            }
+            showColumnSelectionDialog("Select Columns to Randomize", viewModel.selectedRandomizeColumns.value ?: emptySet()) { viewModel.updateSelectedRandomizeColumns(it) }
         }
         binding.buttonSelectUuidColumns.setOnClickListener {
-            showColumnSelectionDialog("Select Columns for NEW UUIDs", viewModel.selectedUuidColumns.value ?: emptySet()) {
-                viewModel.updateSelectedUuidColumns(it)
-            }
+            showColumnSelectionDialog("Select Columns for NEW UUIDs", viewModel.selectedUuidColumns.value ?: emptySet()) { viewModel.updateSelectedUuidColumns(it) }
         }
         binding.buttonProcessAndSave.setOnClickListener {
             val suggestedName = viewModel.selectedFileName.value?.let { "processed_$it" } ?: "processed_output.csv"
@@ -158,31 +152,54 @@ class OptionsActivity : AppCompatActivity() {
     }
 
     private fun startStreamingProcess(
-        sourceUri: Uri,
-        destUri: Uri,
-        rowsToAdd: Int,
-        dateIncrementStep: Long,
-        numberIncrementStep: Long,
-        incrCols: List<String>,
-        randCols: Set<String>,
-        uuidCols: Set<String>,
-        generateFromFirstRowOnly: Boolean,
+        sourceUri: Uri, destUri: Uri, rowsToAdd: Int, dateIncrementStep: Long,
+        numberIncrementStep: Long, incrCols: List<String>, randCols: Set<String>,
+        uuidCols: Set<String>, generateFromFirstRowOnly: Boolean,
         timestampIncrementMode: TimestampIncrementMode
     ) {
-        viewModel.setProcessingStatus("Processing... This may take a while for large files.")
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                try {
-                    val sourceStream = contentResolver.openInputStream(sourceUri)
-                    val destStream = contentResolver.openOutputStream(destUri)
-                    if (sourceStream == null || destStream == null) throw IOException("Failed to open file streams.")
+        showLoadingDialog()
+        viewModel.setProcessingStatus("Preparing...")
 
-                    viewModel.processor.processCsvStreaming(sourceStream, destStream, rowsToAdd, dateIncrementStep, numberIncrementStep, incrCols, uuidCols, randCols, generateFromFirstRowOnly, timestampIncrementMode)
+        lifecycleScope.launch {
+            val totalRowsResult = withContext(Dispatchers.IO) {
+                try {
+                    val countStream = contentResolver.openInputStream(sourceUri) ?: throw IOException("Failed to open file for counting.")
+                    viewModel.processor.countRows(countStream)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Processing failed in background", e)
                     Result.failure(e)
                 }
             }
+
+            if (totalRowsResult.isFailure) {
+                hideLoadingDialog()
+                viewModel.setErrorMessage("Failed to count rows: ${totalRowsResult.exceptionOrNull()?.message}")
+                return@launch
+            }
+
+            val totalSourceRows = totalRowsResult.getOrDefault(0)
+            viewModel.setProcessingStatus("Processing...")
+
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    val sourceStream = contentResolver.openInputStream(sourceUri) ?: throw IOException("Failed to open file for processing.")
+                    val destStream = contentResolver.openOutputStream(destUri) ?: throw IOException("Failed to open destination file.")
+
+                    viewModel.processor.processCsvStreaming(
+                        sourceStream, destStream, rowsToAdd, dateIncrementStep, numberIncrementStep,
+                        incrCols, uuidCols, randCols, generateFromFirstRowOnly, timestampIncrementMode
+                    ) { processedCount ->
+                        val progressString = if (generateFromFirstRowOnly) {
+                            "$processedCount / $rowsToAdd rows generated"
+                        } else {
+                            "$processedCount / $totalSourceRows rows processed"
+                        }
+                        viewModel.updateProgress(progressString)
+                    }
+                } catch (e: Exception) {
+                    Result.failure(e)
+                }
+            }
+            hideLoadingDialog()
             result.fold(
                 onSuccess = { rowsWritten ->
                     viewModel.setProcessingStatus("Success! Wrote $rowsWritten rows to the new file.")
@@ -214,12 +231,34 @@ class OptionsActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showLoadingDialog() {
+        if (loadingDialog == null) {
+            val builder = AlertDialog.Builder(this)
+            val inflater = LayoutInflater.from(this)
+            val view = inflater.inflate(R.layout.dialog_loading, null)
+            progressTextView = view.findViewById(R.id.textViewProgress)
+            builder.setView(view)
+            builder.setCancelable(false)
+            loadingDialog = builder.create()
+        }
+        progressTextView?.text = ""
+        loadingDialog?.show()
+    }
+
+    private fun hideLoadingDialog() {
+        loadingDialog?.dismiss()
+    }
+
     private fun setupObservers() {
         viewModel.errorMessage.observe(this) { message ->
             message?.let {
+                hideLoadingDialog()
                 Toast.makeText(this, it, Toast.LENGTH_LONG).show()
                 viewModel.clearErrorMessage()
             }
+        }
+        viewModel.progressText.observe(this) { progress ->
+            progressTextView?.text = progress
         }
     }
 }
