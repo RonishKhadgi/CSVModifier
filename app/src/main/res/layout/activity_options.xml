@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+        <variable
+            name="viewModel"
+            type="com.example.csvmodifier.viewmodel.MainViewModel" />
+        <import type="android.view.View"/>
+        <import type="android.text.TextUtils"/>
+    </data>
+
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fitsSystemWindows="true">
+
+        <com.google.android.material.appbar.AppBarLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                app:title="Processing Options" />
+
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                tools:context=".view.OptionsActivity">
+
+                <!-- File Info -->
+                <TextView
+                    android:id="@+id/textViewSelectedFileName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:textStyle="bold"
+                    android:text="@{`Selected File: ` + viewModel.selectedFileName}"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <!-- Headers Display -->
+                <TextView
+                    android:id="@+id/textViewCsvHeaders"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@{`Available Headers: ` + (viewModel.csvHeaders != null ? TextUtils.join(`, `, viewModel.csvHeaders) : (viewModel.isLoadingHeaders ? `Loading...` : `None`))}"
+                    android:visibility="@{viewModel.selectedFileName != null ? View.VISIBLE : View.GONE}"
+                    app:layout_constraintTop_toBottomOf="@id/textViewSelectedFileName"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <!-- Increment Column Selection -->
+                <Button
+                    android:id="@+id/buttonSelectTargetColumns"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Select Columns for Increment/Date"
+                    android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"
+                    app:layout_constraintTop_toBottomOf="@id/textViewCsvHeaders"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+                <TextView
+                    android:id="@+id/textViewSelectedTargetColumns"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@{`Selected: ` + (viewModel.selectedTargetColumns.empty ? `None` : TextUtils.join(`, `, viewModel.selectedTargetColumns))}"
+                    android:visibility="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty ? View.VISIBLE : View.GONE}"
+                    app:layout_constraintTop_toBottomOf="@id/buttonSelectTargetColumns"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <!-- NEW Randomizer Column Selection -->
+                <Button
+                    android:id="@+id/buttonSelectRandomizeColumns"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Select Columns to Randomize"
+                    android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"
+                    app:layout_constraintTop_toBottomOf="@id/textViewSelectedTargetColumns"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+                <TextView
+                    android:id="@+id/textViewSelectedRandomizeColumns"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@{`Selected: ` + (viewModel.selectedRandomizeColumns.empty ? `None` : TextUtils.join(`, `, viewModel.selectedRandomizeColumns))}"
+                    android:visibility="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty ? View.VISIBLE : View.GONE}"
+                    app:layout_constraintTop_toBottomOf="@id/buttonSelectRandomizeColumns"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <!-- UUID Column Selection -->
+                <Button
+                    android:id="@+id/buttonSelectUuidColumns"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Select Columns for NEW UUIDs"
+                    android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"
+                    app:layout_constraintTop_toBottomOf="@id/textViewSelectedRandomizeColumns"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+                <TextView
+                    android:id="@+id/textViewSelectedUuidColumns"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@{`Selected: ` + (viewModel.selectedUuidColumns.empty ? `None` : TextUtils.join(`, `, viewModel.selectedUuidColumns))}"
+                    android:visibility="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty ? View.VISIBLE : View.GONE}"
+                    app:layout_constraintTop_toBottomOf="@id/buttonSelectUuidColumns"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <!-- Number of Rows Input -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/textFieldRowsToAdd"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:layout_constraintTop_toBottomOf="@id/textViewSelectedUuidColumns"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextRowsToAdd"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Number of new rows to generate"
+                        android:inputType="number"/>
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Date/Time Increment Step Input -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/textFieldDateIncrementStep"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:layout_constraintTop_toBottomOf="@id/textFieldRowsToAdd"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextDateIncrementStep"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="1"
+                        android:hint="Date/Time Increment Step (days or secs)"
+                        android:inputType="number"/>
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Number Increment Step Input -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/textFieldNumberIncrementStep"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:layout_constraintTop_toBottomOf="@id/textFieldDateIncrementStep"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextNumberIncrementStep"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="1"
+                        android:hint="Number Increment Step"
+                        android:inputType="number"/>
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Timestamp Increment Mode Options -->
+                <TextView
+                    android:id="@+id/textViewTimestampModeLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Timestamp Increment Mode:"
+                    android:textStyle="bold"
+                    app:layout_constraintTop_toBottomOf="@id/textFieldNumberIncrementStep"
+                    app:layout_constraintStart_toStartOf="parent"/>
+                <RadioGroup
+                    android:id="@+id/radioGroupTimestampMode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    app:layout_constraintTop_toBottomOf="@id/textViewTimestampModeLabel"
+                    app:layout_constraintStart_toStartOf="parent">
+                    <RadioButton
+                        android:id="@+id/radioDayAndTime"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="Day &amp; Time (by seconds)" />
+                    <RadioButton
+                        android:id="@+id/radioDayOnly"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Day Only" />
+                    <RadioButton
+                        android:id="@+id/radioTimeOnly"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Time Only (by seconds)" />
+                </RadioGroup>
+
+                <!-- Generation Mode Switch -->
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchFirstRowOnly"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Generate from first data row only"
+                    android:checked="true"
+                    app:layout_constraintTop_toBottomOf="@id/radioGroupTimestampMode"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <!-- Process Button -->
+                <Button
+                    android:id="@+id/buttonProcessAndSave"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Process &amp; Save CSV"
+                    app:layout_constraintTop_toBottomOf="@id/switchFirstRowOnly"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+                <!-- Status Display -->
+                <TextView
+                    android:id="@+id/textViewStatus"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@{viewModel.processingStatus}"
+                    app:layout_constraintTop_toBottomOf="@id/buttonProcessAndSave"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </androidx.core.widget.NestedScrollView>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+</layout>
