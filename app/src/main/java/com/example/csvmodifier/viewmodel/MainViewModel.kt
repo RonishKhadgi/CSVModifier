@@ -77,7 +77,10 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
                     processor.readCsvHeader(inputStream)
                 }
                 headerResult.fold(
-                    onSuccess = { headers -> _csvHeaders.value = headers },
+                    onSuccess = { headers ->
+                        // Sort the headers alphabetically before setting the LiveData value
+                        _csvHeaders.value = headers.sorted()
+                    },
                     onFailure = { error ->
                         _csvHeaders.value = null
                         _errorMessage.value = "Error reading CSV headers: ${error.message}"
