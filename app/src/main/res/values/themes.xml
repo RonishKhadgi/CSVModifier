@@ -1,20 +1,23 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Theme.CSVModifier" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Primary brand color. Used for the app bar. -->
-        <item name="colorPrimary">@color/primary_dark</item>
-        <item name="colorPrimaryVariant">@color/primary_variant_dark</item>
-        <item name="colorOnPrimary">@color/on_primary_text</item>
+        <!-- Primary brand color. Used for the app bar and outlines on some buttons. -->
+        <item name="colorPrimary">@color/veeva_orange_accent</item>
+        <item name="colorPrimaryVariant">@color/veeva_orange_accent_dark</item>
+        <item name="colorOnPrimary">@color/veeva_on_secondary_text</item>
 
-        <!-- Secondary brand color. Used for buttons, switches, and other accents. -->
-        <item name="colorSecondary">@color/secondary_accent</item>
-        <item name="colorSecondaryVariant">@color/secondary_variant_accent</item>
-        <item name="colorOnSecondary">@color/on_secondary_text</item>
+        <!-- Secondary brand color. Used for filled buttons, switches, radio buttons, and other accents. -->
+        <item name="colorSecondary">@color/veeva_orange_accent</item>
+        <item name="colorSecondaryVariant">@color/veeva_orange_accent_dark</item>
+        <item name="colorOnSecondary">@color/veeva_on_secondary_text</item>
 
         <!-- Status bar color. -->
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
 
-        <!-- Set the main window background color -->
-        <item name="android:windowBackground">@color/background_light</item>
+        <!-- Set the main window background color to white -->
+        <item name="android:windowBackground">@color/veeva_background</item>
+
+        <!-- Set default text color for the app -->
+        <item name="android:textColor">@color/veeva_text_on_light</item>
     </style>
 </resources>

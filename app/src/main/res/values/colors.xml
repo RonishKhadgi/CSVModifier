@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Primary Theme Colors -->
-    <color name="primary_dark">#263238</color>  <!-- Dark Slate -->
-    <color name="primary_variant_dark">#37474F</color> <!-- Lighter Slate -->
-    <color name="on_primary_text">#FFFFFF</color> <!-- White Text on Dark Backgrounds -->
+    <!-- Veeva Theme: Primary Colors (for App Bar, etc.) -->
+    <color name="veeva_primary_dark">#222222</color> <!-- A deep, professional dark gray -->
+    <color name="veeva_primary_variant_dark">#000000</color> <!-- Black for the status bar -->
+    <color name="veeva_on_primary_text">#FFFFFF</color> <!-- White text on the dark app bar -->
 
-    <!-- Secondary Accent Colors -->
-    <color name="secondary_accent">#00796B</color> <!-- Vibrant Teal -->
-    <color name="secondary_variant_accent">#004D40</color> <!-- Darker Teal -->
-    <color name="on_secondary_text">#FFFFFF</color> <!-- White Text on Accent Backgrounds -->
+    <!-- Veeva Theme: Secondary Accent Colors (for buttons, switches, interactive elements) -->
+    <color name="veeva_orange_accent">#F37321</color> <!-- Veeva's signature orange -->
+    <color name="veeva_orange_accent_dark">#D85D00</color> <!-- A darker orange for pressed states -->
+    <color name="veeva_on_secondary_text">#FFFFFF</color> <!-- White text on orange buttons -->
 
     <!-- General UI Colors -->
-    <color name="background_light">#ECEFF1</color> <!-- Soft Off-White/Light Gray -->
-    <color name="text_on_light">#212121</color> <!-- Dark Gray Text for Readability -->
+    <color name="veeva_background">#FFFFFF</color> <!-- Clean white background -->
+    <color name="veeva_text_on_light">#212121</color> <!-- Dark gray text for readability -->
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
 </resources>

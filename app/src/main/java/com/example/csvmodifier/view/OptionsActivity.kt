@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.LayoutInflater
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -32,7 +33,9 @@ class OptionsActivity : AppCompatActivity() {
     private lateinit var binding: ActivityOptionsBinding
     private val viewModel: MainViewModel by viewModels()
     private var sourceFileUri: Uri? = null
+
     private var loadingDialog: Dialog? = null
+    private var progressTextView: TextView? = null
 
     private val TAG = "OptionsActivity"
 
@@ -154,22 +157,49 @@ class OptionsActivity : AppCompatActivity() {
         uuidCols: Set<String>, generateFromFirstRowOnly: Boolean,
         timestampIncrementMode: TimestampIncrementMode
     ) {
-        showLoadingDialog() // Show Lottie animation
-        viewModel.setProcessingStatus("Processing... This may take a while for large files.")
+        showLoadingDialog()
+        viewModel.setProcessingStatus("Preparing...")
 
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
+            val totalRowsResult = withContext(Dispatchers.IO) {
                 try {
-                    val sourceStream = contentResolver.openInputStream(sourceUri)
-                    val destStream = contentResolver.openOutputStream(destUri)
-                    if (sourceStream == null || destStream == null) throw IOException("Failed to open file streams.")
-
-                    viewModel.processor.processCsvStreaming(sourceStream, destStream, rowsToAdd, dateIncrementStep, numberIncrementStep, incrCols, uuidCols, randCols, generateFromFirstRowOnly, timestampIncrementMode)
+                    val countStream = contentResolver.openInputStream(sourceUri) ?: throw IOException("Failed to open file for counting.")
+                    viewModel.processor.countRows(countStream)
                 } catch (e: Exception) {
                     Result.failure(e)
                 }
             }
-            hideLoadingDialog() // Hide animation when done
+
+            if (totalRowsResult.isFailure) {
+                hideLoadingDialog()
+                viewModel.setErrorMessage("Failed to count rows: ${totalRowsResult.exceptionOrNull()?.message}")
+                return@launch
+            }
+
+            val totalSourceRows = totalRowsResult.getOrDefault(0)
+            viewModel.setProcessingStatus("Processing...")
+
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    val sourceStream = contentResolver.openInputStream(sourceUri) ?: throw IOException("Failed to open file for processing.")
+                    val destStream = contentResolver.openOutputStream(destUri) ?: throw IOException("Failed to open destination file.")
+
+                    viewModel.processor.processCsvStreaming(
+                        sourceStream, destStream, rowsToAdd, dateIncrementStep, numberIncrementStep,
+                        incrCols, uuidCols, randCols, generateFromFirstRowOnly, timestampIncrementMode
+                    ) { processedCount ->
+                        val progressString = if (generateFromFirstRowOnly) {
+                            "$processedCount / $rowsToAdd rows generated"
+                        } else {
+                            "$processedCount / $totalSourceRows rows processed"
+                        }
+                        viewModel.updateProgress(progressString)
+                    }
+                } catch (e: Exception) {
+                    Result.failure(e)
+                }
+            }
+            hideLoadingDialog()
             result.fold(
                 onSuccess = { rowsWritten ->
                     viewModel.setProcessingStatus("Success! Wrote $rowsWritten rows to the new file.")
@@ -205,10 +235,13 @@ class OptionsActivity : AppCompatActivity() {
         if (loadingDialog == null) {
             val builder = AlertDialog.Builder(this)
             val inflater = LayoutInflater.from(this)
-            builder.setView(inflater.inflate(R.layout.dialog_loading, null))
+            val view = inflater.inflate(R.layout.dialog_loading, null)
+            progressTextView = view.findViewById(R.id.textViewProgress)
+            builder.setView(view)
             builder.setCancelable(false)
             loadingDialog = builder.create()
         }
+        progressTextView?.text = ""
         loadingDialog?.show()
     }
 
@@ -219,10 +252,13 @@ class OptionsActivity : AppCompatActivity() {
     private fun setupObservers() {
         viewModel.errorMessage.observe(this) { message ->
             message?.let {
-                hideLoadingDialog() // Hide loading dialog on error
+                hideLoadingDialog()
                 Toast.makeText(this, it, Toast.LENGTH_LONG).show()
                 viewModel.clearErrorMessage()
             }
+        }
+        viewModel.progressText.observe(this) { progress ->
+            progressTextView?.text = progress
         }
     }
 }
