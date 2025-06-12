@@ -1,18 +1,24 @@
 package com.example.csvmodifier.view
 
 import android.app.Dialog
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.lifecycleScope
@@ -26,6 +32,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 
 class OptionsActivity : AppCompatActivity() {
 
@@ -46,7 +54,7 @@ class OptionsActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { destinationUri: Uri? ->
             if (destinationUri == null) {
                 viewModel.setProcessingStatus("Save cancelled.")
-                viewModel.setLastSavedFile(null) // Clear last saved URI
+                viewModel.setLastSavedFile(null)
                 return@registerForActivityResult
             }
             if (sourceFileUri == null) {
@@ -101,13 +109,31 @@ class OptionsActivity : AppCompatActivity() {
 
     private fun setupUIListeners() {
         binding.buttonSelectTargetColumns.setOnClickListener {
-            showColumnSelectionDialog("Select Columns for Increment/Date", viewModel.selectedTargetColumns.value ?: emptySet()) { viewModel.updateSelectedTargetColumns(it) }
+            val disabledCols = (viewModel.selectedRandomizeColumns.value ?: emptySet()) +
+                    (viewModel.selectedUuidColumns.value ?: emptySet())
+            showColumnSelectionDialog(
+                "Select Columns for Increment/Date",
+                viewModel.selectedTargetColumns.value ?: emptySet(),
+                disabledCols
+            ) { viewModel.updateSelectedTargetColumns(it) }
         }
         binding.buttonSelectRandomizeColumns.setOnClickListener {
-            showColumnSelectionDialog("Select Columns to Randomize", viewModel.selectedRandomizeColumns.value ?: emptySet()) { viewModel.updateSelectedRandomizeColumns(it) }
+            val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) +
+                    (viewModel.selectedUuidColumns.value ?: emptySet())
+            showColumnSelectionDialog(
+                "Select Columns to Randomize",
+                viewModel.selectedRandomizeColumns.value ?: emptySet(),
+                disabledCols
+            ) { viewModel.updateSelectedRandomizeColumns(it) }
         }
         binding.buttonSelectUuidColumns.setOnClickListener {
-            showColumnSelectionDialog("Select Columns for NEW UUIDs", viewModel.selectedUuidColumns.value ?: emptySet()) { viewModel.updateSelectedUuidColumns(it) }
+            val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) +
+                    (viewModel.selectedRandomizeColumns.value ?: emptySet())
+            showColumnSelectionDialog(
+                "Select Columns for NEW UUIDs",
+                viewModel.selectedUuidColumns.value ?: emptySet(),
+                disabledCols
+            ) { viewModel.updateSelectedUuidColumns(it) }
         }
         binding.buttonProcessAndSave.setOnClickListener {
             val suggestedName = viewModel.selectedFileName.value?.let { "processed_$it" } ?: "processed_output.csv"
@@ -164,16 +190,14 @@ class OptionsActivity : AppCompatActivity() {
     ) {
         showLoadingDialog()
         viewModel.setProcessingStatus("Preparing...")
-        viewModel.setLastSavedFile(null) // Clear previous saved file URI
+        viewModel.setLastSavedFile(null)
 
         lifecycleScope.launch {
             val totalRowsResult: Result<Int> = withContext(Dispatchers.IO) {
                 try {
                     val countStream = contentResolver.openInputStream(sourceUri) ?: throw IOException("Failed to open file for counting.")
                     viewModel.processor.countRows(countStream)
-                } catch (e: Exception) {
-                    Result.failure(e)
-                }
+                } catch (e: Exception) { Result.failure(e) }
             }
 
             if (totalRowsResult.isFailure) {
@@ -194,48 +218,72 @@ class OptionsActivity : AppCompatActivity() {
                         sourceStream, destStream, rowsToAdd, dateIncrementStep, numberIncrementStep,
                         incrCols, uuidCols, randCols, generateFromFirstRowOnly, timestampIncrementMode
                     ) { processedCount ->
-                        val progressString = if (generateFromFirstRowOnly) {
-                            "$processedCount / $rowsToAdd rows generated"
-                        } else {
-                            "$processedCount / $totalSourceRows rows processed"
-                        }
+                        val progressString = if (generateFromFirstRowOnly) "$processedCount / $rowsToAdd rows generated"
+                        else "$processedCount / $totalSourceRows rows processed"
                         viewModel.updateProgress(progressString)
                     }
-                } catch (e: Exception) {
-                    Result.failure(e)
-                }
+                } catch (e: Exception) { Result.failure(e) }
             }
             hideLoadingDialog()
             result.fold(
                 onSuccess = { rowsWritten ->
                     viewModel.setProcessingStatus("Success! Wrote $rowsWritten rows to the new file.")
-                    viewModel.setLastSavedFile(destUri) // Set the URI on success
+                    viewModel.setLastSavedFile(destUri)
                     Toast.makeText(this@OptionsActivity, "Processing complete!", Toast.LENGTH_LONG).show()
                 },
                 onFailure = { error ->
                     viewModel.setErrorMessage("Processing failed: ${error.message}")
-                    viewModel.setLastSavedFile(null) // Clear on failure
+                    viewModel.setLastSavedFile(null)
                 }
             )
         }
     }
 
-    private fun showColumnSelectionDialog(title: String, currentSelection: Set<String>, onConfirm: (Set<String>) -> Unit) {
+    private fun showColumnSelectionDialog(
+        title: String,
+        currentSelection: Set<String>,
+        disabledByOtherActions: Set<String>,
+        onConfirm: (Set<String>) -> Unit
+    ) {
         val availableHeaders = viewModel.csvHeaders.value
         if (availableHeaders.isNullOrEmpty()) {
             Toast.makeText(this, "Headers not available.", Toast.LENGTH_SHORT).show()
             return
         }
+
         val items = availableHeaders.toTypedArray()
         val checkedItems = BooleanArray(items.size) { items[it] in currentSelection }
-        val newSelectedTemp = currentSelection.toMutableSet()
+
+        // This set will track what the user checks/unchecks during this dialog session
+        val tempSelection = currentSelection.toMutableSet()
+
         AlertDialog.Builder(this)
             .setTitle(title)
             .setMultiChoiceItems(items, checkedItems) { _, which, isChecked ->
-                if (isChecked) newSelectedTemp.add(items[which]) else newSelectedTemp.remove(items[which])
+                val selectedColumn = items[which]
+
+                // If the user tries to check an item that is disabled
+                if (isChecked && disabledByOtherActions.contains(selectedColumn)) {
+                    Toast.makeText(this@OptionsActivity, "'$selectedColumn' is in use by another action.", Toast.LENGTH_SHORT).show()
+                    // Revert the check on the ListView immediately
+                    (this as? AlertDialog)?.listView?.setItemChecked(which, false)
+                } else {
+                    // Otherwise, update our temporary selection list
+                    if (isChecked) {
+                        tempSelection.add(selectedColumn)
+                    } else {
+                        tempSelection.remove(selectedColumn)
+                    }
+                }
             }
-            .setPositiveButton("OK") { dialog, _ -> onConfirm(newSelectedTemp); dialog.dismiss() }
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .setPositiveButton("OK") { dialog, _ ->
+                // When OK is clicked, confirm the temporary selection
+                onConfirm(tempSelection)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
             .show()
     }
 
@@ -257,10 +305,9 @@ class OptionsActivity : AppCompatActivity() {
         loadingDialog?.dismiss()
     }
 
-    private fun shareFile(fileUri: Uri) { // Renamed from shareFileViaCache for simplicity
+    private fun shareFile(fileUri: Uri) {
         try {
             val inputStream = contentResolver.openInputStream(fileUri)
-            // Use a file name that includes the original name to avoid conflicts
             val originalFileName = viewModel.selectedFileName.value ?: "shared_file.csv"
             val tempFile = File(cacheDir, originalFileName)
             val outputStream = FileOutputStream(tempFile)
@@ -269,11 +316,7 @@ class OptionsActivity : AppCompatActivity() {
             inputStream?.close()
             outputStream.close()
 
-            val shareUri = FileProvider.getUriForFile(
-                this,
-                "${applicationContext.packageName}.provider", // Using applicationContext.packageName is more robust
-                tempFile
-            )
+            val shareUri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.provider", tempFile)
 
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/csv"

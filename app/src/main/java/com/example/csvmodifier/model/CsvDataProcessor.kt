@@ -199,7 +199,7 @@ class CsvDataProcessor {
                 return formatted
             } catch (e: DateTimeParseException) { /* Try next */ }
         }
-        
+
         val regex = Regex("^(.*?)(\\d+)$")
         val matchResult = regex.matchEntire(trimmedValue)
         if (matchResult != null) {

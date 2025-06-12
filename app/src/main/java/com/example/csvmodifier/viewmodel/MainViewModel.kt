@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.InputStream
+import java.io.OutputStream
 
 class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel() {
 
@@ -25,7 +26,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     private val _progressText = MutableLiveData<String>()
     val progressText: LiveData<String> get() = _progressText
 
-    // NEW: LiveData to hold the URI of the last saved file for sharing
+    // LiveData to hold the URI of the last saved file for sharing
     private val _lastSavedFileUri = MutableLiveData<Uri?>()
     val lastSavedFileUri: LiveData<Uri?> get() = _lastSavedFileUri
 
@@ -53,7 +54,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         _progressText.postValue(text)
     }
 
-    //Function to set the URI of the last saved file
+    // Function to set the URI of the last saved file
     fun setLastSavedFile(uri: Uri?) {
         _lastSavedFileUri.postValue(uri)
     }
@@ -81,7 +82,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         _selectedTargetColumns.value = emptySet()
         _selectedUuidColumns.value = emptySet()
         _selectedRandomizeColumns.value = emptySet()
-        _lastSavedFileUri.value = null // Clear last saved file
+        _lastSavedFileUri.value = null // Also clear here
 
         viewModelScope.launch {
             try {
@@ -101,8 +102,19 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         }
     }
 
-    fun updateSelectedTargetColumns(newSelection: Set<String>) { _selectedTargetColumns.value = newSelection }
-    fun updateSelectedUuidColumns(newSelection: Set<String>) { _selectedUuidColumns.value = newSelection }
-    fun updateSelectedRandomizeColumns(newSelection: Set<String>) { _selectedRandomizeColumns.value = newSelection }
+    // UPDATED: These functions now only update their own list.
+    // The logic to prevent dual-selection is moved to the UI layer.
+    fun updateSelectedTargetColumns(newSelection: Set<String>) {
+        _selectedTargetColumns.value = newSelection
+    }
+
+    fun updateSelectedUuidColumns(newSelection: Set<String>) {
+        _selectedUuidColumns.value = newSelection
+    }
+
+    fun updateSelectedRandomizeColumns(newSelection: Set<String>) {
+        _selectedRandomizeColumns.value = newSelection
+    }
+
     fun clearErrorMessage() { _errorMessage.value = null }
 }
