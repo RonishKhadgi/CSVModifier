@@ -41,7 +41,7 @@ class MainActivity : AppCompatActivity() {
         binding.buttonSelectFile.setOnClickListener {
             Log.d(TAG, "Select File button clicked. Launching file picker.")
             try {
-                filePickerLauncher.launch("*/*") // Use general MIME type for better compatibility
+                filePickerLauncher.launch("*/*") // General MIME type for better compatibility
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to launch file picker", e)
                 Toast.makeText(this, "Cannot open file picker. No suitable app found.", Toast.LENGTH_LONG).show()

@@ -5,8 +5,7 @@ import com.github.doyaaaaaken.kotlincsv.dsl.csvReader
 import com.github.doyaaaaaken.kotlincsv.dsl.csvWriter
 import java.io.InputStream
 import java.io.OutputStream
-import java.io.IOException // Ensure this import is present
-import java.nio.charset.StandardCharsets
+import java.io.IOException
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -32,8 +31,6 @@ class CsvDataProcessor {
         "dd/MM/yyyy" to DateTimeFormatter.ofPattern("dd/MM/yyyy"),
         "yyyy-MM-dd" to DateTimeFormatter.ofPattern("yyyy-MM-dd")
     )
-
-    // private val ALPHANUMERIC_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // Reverted change, no longer needed
 
     /**
      * Counts the number of data rows in a CSV file.
@@ -202,8 +199,7 @@ class CsvDataProcessor {
                 return formatted
             } catch (e: DateTimeParseException) { /* Try next */ }
         }
-
-        // REVERTED to PREFIXNUMBER randomization logic.
+        
         val regex = Regex("^(.*?)(\\d+)$")
         val matchResult = regex.matchEntire(trimmedValue)
         if (matchResult != null) {

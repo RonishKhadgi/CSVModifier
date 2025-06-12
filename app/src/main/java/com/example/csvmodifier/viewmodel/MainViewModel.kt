@@ -11,7 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.InputStream
-import java.io.OutputStream
 
 class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel() {
 
@@ -54,7 +53,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         _progressText.postValue(text)
     }
 
-    // NEW: Function to set the URI of the last saved file
+    //Function to set the URI of the last saved file
     fun setLastSavedFile(uri: Uri?) {
         _lastSavedFileUri.postValue(uri)
     }

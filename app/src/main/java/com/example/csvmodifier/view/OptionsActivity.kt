@@ -16,7 +16,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.lifecycleScope
-// import com.example.csvmodifier.BuildConfig // This import is no longer needed
 import com.example.csvmodifier.R
 import com.example.csvmodifier.databinding.ActivityOptionsBinding
 import com.example.csvmodifier.model.TimestampIncrementMode
@@ -27,8 +26,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
 
 class OptionsActivity : AppCompatActivity() {
 
@@ -259,9 +256,6 @@ class OptionsActivity : AppCompatActivity() {
     private fun hideLoadingDialog() {
         loadingDialog?.dismiss()
     }
-
-    // This function is no longer needed as the robust shareFileViaCache is the primary method.
-    // private fun shareFile(fileUri: Uri) { ... }
 
     private fun shareFile(fileUri: Uri) { // Renamed from shareFileViaCache for simplicity
         try {
