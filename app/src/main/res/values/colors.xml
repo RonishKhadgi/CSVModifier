@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Primary Theme Colors -->
+    <color name="primary_dark">#263238</color>  <!-- Dark Slate -->
+    <color name="primary_variant_dark">#37474F</color> <!-- Lighter Slate -->
+    <color name="on_primary_text">#FFFFFF</color> <!-- White Text on Dark Backgrounds -->
+
+    <!-- Secondary Accent Colors -->
+    <color name="secondary_accent">#00796B</color> <!-- Vibrant Teal -->
+    <color name="secondary_variant_accent">#004D40</color> <!-- Darker Teal -->
+    <color name="on_secondary_text">#FFFFFF</color> <!-- White Text on Accent Backgrounds -->
+
+    <!-- General UI Colors -->
+    <color name="background_light">#ECEFF1</color> <!-- Soft Off-White/Light Gray -->
+    <color name="text_on_light">#212121</color> <!-- Dark Gray Text for Readability -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
 </resources>
