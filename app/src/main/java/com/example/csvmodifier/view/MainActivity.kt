@@ -84,11 +84,17 @@ class MainActivity : AppCompatActivity() {
                 return@registerForActivityResult
             }
 
-            // NEW: Get the increment step value
-            val incrementStepStr = binding.editTextIncrementStep.text.toString()
-            val incrementStep = incrementStepStr.toLongOrNull()
-            if (incrementStep == null || incrementStep <= 0) {
-                viewModel.setErrorMessage("Please enter a valid positive number for the increment step.")
+            val dateIncrementStepStr = binding.editTextDateIncrementStep.text.toString()
+            val dateIncrementStep = dateIncrementStepStr.toLongOrNull()
+            if (dateIncrementStep == null || dateIncrementStep <= 0) {
+                viewModel.setErrorMessage("Please enter a valid positive number for the Date/Time increment step.")
+                return@registerForActivityResult
+            }
+
+            val numberIncrementStepStr = binding.editTextNumberIncrementStep.text.toString()
+            val numberIncrementStep = numberIncrementStepStr.toLongOrNull()
+            if (numberIncrementStep == null || numberIncrementStep <= 0) {
+                viewModel.setErrorMessage("Please enter a valid positive number for the Number increment step.")
                 return@registerForActivityResult
             }
 
@@ -108,7 +114,7 @@ class MainActivity : AppCompatActivity() {
                 else -> TimestampIncrementMode.DAY_AND_TIME // Default case
             }
 
-            startStreamingProcess(sourceUri, destinationUri, rowsToAdd, incrementStep, selectedIncrCols.toList(), selectedUuidCols, generateFromFirstRowOnly, timestampMode)
+            startStreamingProcess(sourceUri, destinationUri, rowsToAdd, dateIncrementStep, numberIncrementStep, selectedIncrCols.toList(), selectedUuidCols, generateFromFirstRowOnly, timestampMode)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -155,7 +161,8 @@ class MainActivity : AppCompatActivity() {
         sourceUri: Uri,
         destUri: Uri,
         rowsToAdd: Int,
-        incrementStep: Long, // NEW PARAMETER
+        dateIncrementStep: Long,
+        numberIncrementStep: Long,
         incrCols: List<String>,
         uuidCols: Set<String>,
         generateFromFirstRowOnly: Boolean,
@@ -170,7 +177,7 @@ class MainActivity : AppCompatActivity() {
                     if (sourceStream == null || destStream == null) {
                         throw IOException("Failed to open file streams.")
                     }
-                    viewModel.processor.processCsvStreaming(sourceStream, destStream, rowsToAdd, incrementStep, incrCols, uuidCols, generateFromFirstRowOnly, timestampIncrementMode)
+                    viewModel.processor.processCsvStreaming(sourceStream, destStream, rowsToAdd, dateIncrementStep, numberIncrementStep, incrCols, uuidCols, generateFromFirstRowOnly, timestampIncrementMode)
                 } catch (e: Exception) {
                     Log.e(TAG, "Processing failed in background", e)
                     Result.failure(e)
