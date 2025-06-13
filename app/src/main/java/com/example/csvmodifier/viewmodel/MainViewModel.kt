@@ -41,21 +41,14 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     private val _selectedRandomizeColumns = MutableLiveData<Set<String>>(emptySet())
     val selectedRandomizeColumns: LiveData<Set<String>> get() = _selectedRandomizeColumns
 
-    fun setProcessingStatus(status: String) {
-        _processingStatus.postValue(status)
-    }
+    // NEW: LiveData for the "value from list" feature
+    private val _selectedValueFromListColumns = MutableLiveData<Map<String, List<String>>>(emptyMap())
+    val selectedValueFromListColumns: LiveData<Map<String, List<String>>> get() = _selectedValueFromListColumns
 
-    fun setErrorMessage(message: String?) {
-        _errorMessage.postValue(message)
-    }
-
-    fun updateProgress(text: String) {
-        _progressText.postValue(text)
-    }
-
-    fun setLastSavedFile(uri: Uri?) {
-        _lastSavedFileUri.postValue(uri)
-    }
+    fun setProcessingStatus(status: String) { _processingStatus.postValue(status) }
+    fun setErrorMessage(message: String?) { _errorMessage.postValue(message) }
+    fun updateProgress(text: String) { _progressText.postValue(text) }
+    fun setLastSavedFile(uri: Uri?) { _lastSavedFileUri.postValue(uri) }
 
     fun setSelectedFile(fileName: String?) {
         savedStateHandle["selectedFileNameKey"] = fileName
@@ -64,6 +57,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
             _selectedTargetColumns.value = emptySet()
             _selectedUuidColumns.value = emptySet()
             _selectedRandomizeColumns.value = emptySet()
+            _selectedValueFromListColumns.value = emptyMap()
             _lastSavedFileUri.value = null
         }
     }
@@ -77,9 +71,11 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         }
         _isLoadingHeaders.value = true
         _errorMessage.value = null
+        // Clear all selections when a new file is loaded
         _selectedTargetColumns.value = emptySet()
         _selectedUuidColumns.value = emptySet()
         _selectedRandomizeColumns.value = emptySet()
+        _selectedValueFromListColumns.value = emptyMap()
         _lastSavedFileUri.value = null
 
         viewModelScope.launch {
@@ -94,43 +90,40 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
                         _errorMessage.value = "Error reading CSV headers: ${error.message}"
                     }
                 )
-            } finally {
-                _isLoadingHeaders.value = false
-            }
+            } finally { _isLoadingHeaders.value = false }
         }
     }
 
-    /**
-     * Updates the set of selected columns for incrementing.
-     * Removes the selected columns from the other action lists.
-     */
+    // Helper to remove a key from all other selection lists
+    private fun clearColumnFromOtherSelections(columnName: String, skipList: MutableLiveData<*>) {
+        if (_selectedTargetColumns != skipList) _selectedTargetColumns.value = _selectedTargetColumns.value?.minus(columnName)
+        if (_selectedUuidColumns != skipList) _selectedUuidColumns.value = _selectedUuidColumns.value?.minus(columnName)
+        if (_selectedRandomizeColumns != skipList) _selectedRandomizeColumns.value = _selectedRandomizeColumns.value?.minus(columnName)
+        if (_selectedValueFromListColumns != skipList) _selectedValueFromListColumns.value = _selectedValueFromListColumns.value?.minus(columnName)
+    }
+
     fun updateSelectedTargetColumns(newSelection: Set<String>) {
+        newSelection.forEach { clearColumnFromOtherSelections(it, _selectedTargetColumns) }
         _selectedTargetColumns.value = newSelection
-        // Remove from other lists
-        _selectedRandomizeColumns.value = _selectedRandomizeColumns.value?.minus(newSelection)
-        _selectedUuidColumns.value = _selectedUuidColumns.value?.minus(newSelection)
     }
-
-    /**
-     * Updates the set of selected columns for UUID generation.
-     * Removes the selected columns from the other action lists.
-     */
     fun updateSelectedUuidColumns(newSelection: Set<String>) {
+        newSelection.forEach { clearColumnFromOtherSelections(it, _selectedUuidColumns) }
         _selectedUuidColumns.value = newSelection
-        // Remove from other lists
-        _selectedTargetColumns.value = _selectedTargetColumns.value?.minus(newSelection)
-        _selectedRandomizeColumns.value = _selectedRandomizeColumns.value?.minus(newSelection)
     }
-
-    /**
-     * Updates the set of selected columns for randomization.
-     * Removes the selected columns from the other action lists.
-     */
     fun updateSelectedRandomizeColumns(newSelection: Set<String>) {
+        newSelection.forEach { clearColumnFromOtherSelections(it, _selectedRandomizeColumns) }
         _selectedRandomizeColumns.value = newSelection
-        // Remove from other lists
-        _selectedTargetColumns.value = _selectedTargetColumns.value?.minus(newSelection)
-        _selectedUuidColumns.value = _selectedUuidColumns.value?.minus(newSelection)
+    }
+    fun updateValueFromListColumn(columnName: String, values: List<String>) {
+        clearColumnFromOtherSelections(columnName, _selectedValueFromListColumns)
+        val newMap = (_selectedValueFromListColumns.value ?: emptyMap()).toMutableMap()
+        newMap[columnName] = values
+        _selectedValueFromListColumns.value = newMap
+    }
+    fun removeValueFromListColumn(columnName: String) {
+        val newMap = (_selectedValueFromListColumns.value ?: emptyMap()).toMutableMap()
+        newMap.remove(columnName)
+        _selectedValueFromListColumns.value = newMap
     }
 
     fun clearErrorMessage() { _errorMessage.value = null }
