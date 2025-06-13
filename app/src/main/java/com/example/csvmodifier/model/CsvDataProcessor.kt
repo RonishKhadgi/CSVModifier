@@ -27,8 +27,6 @@ class CsvDataProcessor {
     private val INCREMENT_TAG = "CsvProcessorIncrement"
     private val RANDOM_TAG = "CsvRandomizer"
 
-    private val ALPHANUMERIC_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
     private val datePatternFormatters: List<Pair<String, DateTimeFormatter>> = listOf(
         "MM/dd/yyyy" to DateTimeFormatter.ofPattern("MM/dd/yyyy"),
         "dd/MM/yyyy" to DateTimeFormatter.ofPattern("dd/MM/yyyy"),
@@ -39,21 +37,31 @@ class CsvDataProcessor {
         var rowCount = 0
         return try {
             csvReader().open(sourceStream) {
-                if (readNext() == null) { return@open }
+                if (readNext() == null) { return@open } // Skip header, handle empty file
                 while(readNext() != null) { rowCount++ }
             }
+            Log.d(TAG, "Counted $rowCount data rows.")
             Result.success(rowCount)
-        } catch (e: Exception) { Result.failure(e) }
-        finally { try { sourceStream.close() } catch (e: IOException) { /* ignore */ } }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to count rows", e)
+            Result.failure(e)
+        } finally {
+            try { sourceStream.close() } catch (e: IOException) { /* ignore */ }
+        }
     }
 
     fun readCsvHeader(inputStream: InputStream): Result<List<String>> {
         return try {
-            val headerRow: List<String>? = csvReader().open(inputStream) { readNext() }
+            val headerRow: List<String>? = csvReader().open(inputStream) {
+                readNext()
+            }
             if (headerRow != null && headerRow.isNotEmpty()) { Result.success(headerRow) }
             else { Result.failure(IllegalArgumentException("CSV file appears to be empty or header is missing.")) }
-        } catch (e: Exception) { Result.failure(e) }
-        finally { try { inputStream.close() } catch (e: Exception) { /* ignore */ } }
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            try { inputStream.close() } catch (e: Exception) { /* ignore */ }
+        }
     }
 
     fun processCsvStreaming(
@@ -65,12 +73,13 @@ class CsvDataProcessor {
         incrementColumnNames: List<String>,
         uuidColumnNames: Set<String>,
         randomizeColumnNames: Set<String>,
-        valueFromListMap: Map<String, List<String>>, // NEW
+        valueFromListMap: Map<String, List<String>>, // Parameter for the new feature
         generateFromFirstRowOnly: Boolean,
         timestampIncrementMode: TimestampIncrementMode,
         onProgress: (Int) -> Unit
     ): Result<Long> {
         var totalRowsWritten = 0L
+        Log.d(TAG, "Starting CSV STREAMING. Date Step: $dateIncrementStep, Number Step: $numberIncrementStep")
 
         try {
             csvReader().open(sourceStream) {
@@ -134,7 +143,7 @@ class CsvDataProcessor {
         incrementIndices: List<Pair<String, Int>>,
         uuidIndices: Set<Int>,
         randomizeIndices: Set<Int>,
-        listValueIndices: Map<Int, List<String>>, // NEW
+        listValueIndices: Map<Int, List<String>>, // Parameter for the new feature
         timestampIncrementMode: TimestampIncrementMode
     ): List<String> {
         val newRow = templateRow.toMutableList()
@@ -159,15 +168,22 @@ class CsvDataProcessor {
 
     private fun randomizeValue(originalValue: String): String {
         val trimmedValue = originalValue.trim()
+        Log.d(RANDOM_TAG, "Attempting to randomize value: '$trimmedValue'")
+
+        // Try boolean
         if (trimmedValue.equals("true", ignoreCase = true) || trimmedValue.equals("false", ignoreCase = true)) {
             return Random.nextBoolean().toString()
         }
+
+        // Try ZonedDateTime
         try {
             val originalDate = ZonedDateTime.parse(trimmedValue)
             val randomDays = Random.Default.nextLong(-365, 366)
             val randomSeconds = Random.Default.nextLong(-86400, 86401)
             return originalDate.plusDays(randomDays).plusSeconds(randomSeconds).format(DateTimeFormatter.ISO_INSTANT)
         } catch (e: DateTimeParseException) { /* Not a timestamp */ }
+
+        // Try simple Date
         for ((_, formatter) in datePatternFormatters) {
             try {
                 val originalDate = LocalDate.parse(trimmedValue, formatter)
@@ -175,14 +191,22 @@ class CsvDataProcessor {
                 return originalDate.plusDays(randomDays).format(formatter)
             } catch (e: DateTimeParseException) { /* Try next */ }
         }
-        val randomizedString = trimmedValue.map { char ->
-            when {
-                char.isLetter() -> ALPHANUMERIC_CHARS.random()
-                char.isDigit() -> ALPHANUMERIC_CHARS.random()
-                else -> char
-            }
-        }.joinToString("")
-        return randomizedString
+
+        // REVERTED to PREFIXNUMBER randomization logic.
+        val regex = Regex("^(.*?)(\\d+)$")
+        val matchResult = regex.matchEntire(trimmedValue)
+        if (matchResult != null) {
+            val prefix = matchResult.groupValues[1]
+            val numberPart = matchResult.groupValues[2]
+            val maxRandom = "9".repeat(numberPart.length).toLongOrNull() ?: Long.MAX_VALUE
+            val randomNumber = Random.Default.nextLong(0, maxRandom + 1)
+            val randomString = randomNumber.toString().padStart(numberPart.length, '0')
+            Log.d(RANDOM_TAG, "PREFIXNUMBER detected. New random value: ${prefix}${randomString}")
+            return prefix + randomString
+        }
+
+        Log.d(RANDOM_TAG, "No specific format detected. Returning original value.")
+        return originalValue
     }
 
     private fun incrementValue(
@@ -192,6 +216,7 @@ class CsvDataProcessor {
         timestampIncrementMode: TimestampIncrementMode
     ): String {
         val trimmedValue = value.trim()
+
         try {
             val zonedDateTime = ZonedDateTime.parse(trimmedValue)
             val newDateTime = when (timestampIncrementMode) {
@@ -201,12 +226,14 @@ class CsvDataProcessor {
             }
             return newDateTime.format(DateTimeFormatter.ISO_INSTANT)
         } catch (e: DateTimeParseException) { /* Not a ZonedDateTime */ }
+
         for ((_, formatter) in datePatternFormatters) {
             try {
                 val date = LocalDate.parse(trimmedValue, formatter)
                 return date.plusDays(cumulativeDateIncrement).format(formatter)
             } catch (e: DateTimeParseException) { /* Try next */ }
         }
+
         val regex = Regex("^(.*?)(\\d+)$")
         val matchResult = regex.matchEntire(trimmedValue)
         if (matchResult != null) {
@@ -218,6 +245,7 @@ class CsvDataProcessor {
                 return prefix + newNumber.toString().padStart(numberPart.length, '0')
             }
         }
+
         return trimmedValue
     }
 }

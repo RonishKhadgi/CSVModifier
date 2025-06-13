@@ -4,7 +4,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
-        <variable name="viewModel" type="com.example.csvmodifier.viewmodel.MainViewModel" />
+        <variable
+            name="viewModel"
+            type="com.example.csvmodifier.viewmodel.MainViewModel" />
         <import type="android.view.View"/>
         <import type="android.text.TextUtils"/>
     </data>
@@ -63,6 +65,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- Step 1: Column Selection -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardColumnSelection"
                     android:layout_width="0dp"
@@ -77,11 +80,18 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Step 1: Choose Columns to Modify"
+                            android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6"/>
+
                         <Button
                             android:id="@+id/buttonSelectValueFromList"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
                             android:text="Select Column for List Values"
                             app:icon="@drawable/ic_list"
                             android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"/>
@@ -153,12 +163,25 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <Button
+                    android:id="@+id/buttonNext"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Next"
+                    app:icon="@drawable/ic_next"
+                    app:iconGravity="textEnd"
+                    app:layout_constraintTop_toBottomOf="@id/cardColumnSelection"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <!-- Step 2: Generation Settings -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardGenerationSettings"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    app:layout_constraintTop_toBottomOf="@id/cardColumnSelection"
+                    app:layout_constraintTop_toBottomOf="@id/cardFileInfo"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent">
                     <LinearLayout
@@ -167,10 +190,17 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Step 2: Set Generation Options"
+                            android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6"/>
+
                         <com.google.android.material.textfield.TextInputLayout
                             android:id="@+id/textFieldRowsToAdd"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
                             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/editTextRowsToAdd"
@@ -249,16 +279,32 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <Button
-                    android:id="@+id/buttonProcessAndSave"
+                <LinearLayout
+                    android:id="@+id/layoutBottomButtons"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:orientation="horizontal"
                     android:layout_marginTop="16dp"
-                    android:text="Process &amp; Save CSV"
-                    app:icon="@drawable/ic_save"
                     app:layout_constraintTop_toBottomOf="@id/cardGenerationSettings"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent" />
+                    app:layout_constraintEnd_toEndOf="parent">
+                    <Button
+                        android:id="@+id/buttonBack"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="Back"
+                        app:icon="@drawable/ic_back"/>
+                    <Button
+                        android:id="@+id/buttonProcessAndSave"
+                        android:layout_width="0dp"
+                        android:layout_weight="2"
+                        android:layout_height="wrap_content"
+                        android:text="Process &amp; Save"
+                        app:icon="@drawable/ic_save"/>
+                </LinearLayout>
 
                 <Button
                     android:id="@+id/buttonShare"
@@ -269,7 +315,7 @@
                     android:text="Share Last Saved File"
                     app:icon="@android:drawable/ic_menu_share"
                     android:visibility="@{viewModel.lastSavedFileUri != null ? View.VISIBLE : View.GONE}"
-                    app:layout_constraintTop_toBottomOf="@id/buttonProcessAndSave"
+                    app:layout_constraintTop_toBottomOf="@id/layoutBottomButtons"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
 
@@ -283,6 +329,21 @@
                     app:layout_constraintTop_toBottomOf="@id/buttonShare"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
+
+                <!-- Constraint Groups to manage visibility -->
+                <androidx.constraintlayout.widget.Group
+                    android:id="@+id/groupStep1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:constraint_referenced_ids="cardColumnSelection,buttonNext"
+                    android:visibility="visible" />
+
+                <androidx.constraintlayout.widget.Group
+                    android:id="@+id/groupStep2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:constraint_referenced_ids="cardGenerationSettings,layoutBottomButtons,buttonShare,textViewStatus"
+                    android:visibility="gone" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
         </androidx.core.widget.NestedScrollView>
