@@ -1,24 +1,18 @@
 package com.example.csvmodifier.view
 
 import android.app.Dialog
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.ArrayAdapter
-import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.lifecycleScope
@@ -245,40 +239,32 @@ class OptionsActivity : AppCompatActivity() {
         disabledByOtherActions: Set<String>,
         onConfirm: (Set<String>) -> Unit
     ) {
-        val availableHeaders = viewModel.csvHeaders.value
-        if (availableHeaders.isNullOrEmpty()) {
+        val allHeaders = viewModel.csvHeaders.value
+        if (allHeaders.isNullOrEmpty()) {
             Toast.makeText(this, "Headers not available.", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val items = availableHeaders.toTypedArray()
-        val checkedItems = BooleanArray(items.size) { items[it] in currentSelection }
+        // Filter the list to show only columns that are NOT disabled
+        val availableItems = allHeaders.filter { it !in disabledByOtherActions }.toTypedArray()
 
-        // This set will track what the user checks/unchecks during this dialog session
-        val tempSelection = currentSelection.toMutableSet()
+        // The selection must also be filtered to only include available items
+        val checkedItems = BooleanArray(availableItems.size) { availableItems[it] in currentSelection }
 
         AlertDialog.Builder(this)
             .setTitle(title)
-            .setMultiChoiceItems(items, checkedItems) { _, which, isChecked ->
-                val selectedColumn = items[which]
-
-                // If the user tries to check an item that is disabled
-                if (isChecked && disabledByOtherActions.contains(selectedColumn)) {
-                    Toast.makeText(this@OptionsActivity, "'$selectedColumn' is in use by another action.", Toast.LENGTH_SHORT).show()
-                    // Revert the check on the ListView immediately
-                    (this as? AlertDialog)?.listView?.setItemChecked(which, false)
-                } else {
-                    // Otherwise, update our temporary selection list
-                    if (isChecked) {
-                        tempSelection.add(selectedColumn)
-                    } else {
-                        tempSelection.remove(selectedColumn)
-                    }
-                }
+            .setMultiChoiceItems(availableItems, checkedItems) { _, _, _ ->
+                // The dialog handles the checking/unchecking automatically for the available items.
             }
             .setPositiveButton("OK") { dialog, _ ->
-                // When OK is clicked, confirm the temporary selection
-                onConfirm(tempSelection)
+                val selected = mutableSetOf<String>()
+                val listView = (dialog as AlertDialog).listView
+                for (i in 0 until listView.count) {
+                    if (listView.isItemChecked(i)) {
+                        selected.add(availableItems[i])
+                    }
+                }
+                onConfirm(selected)
                 dialog.dismiss()
             }
             .setNegativeButton("Cancel") { dialog, _ ->

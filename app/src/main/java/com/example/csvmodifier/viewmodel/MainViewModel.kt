@@ -26,7 +26,6 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     private val _progressText = MutableLiveData<String>()
     val progressText: LiveData<String> get() = _progressText
 
-    // LiveData to hold the URI of the last saved file for sharing
     private val _lastSavedFileUri = MutableLiveData<Uri?>()
     val lastSavedFileUri: LiveData<Uri?> get() = _lastSavedFileUri
 
@@ -54,7 +53,6 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         _progressText.postValue(text)
     }
 
-    // Function to set the URI of the last saved file
     fun setLastSavedFile(uri: Uri?) {
         _lastSavedFileUri.postValue(uri)
     }
@@ -66,7 +64,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
             _selectedTargetColumns.value = emptySet()
             _selectedUuidColumns.value = emptySet()
             _selectedRandomizeColumns.value = emptySet()
-            _lastSavedFileUri.value = null // Clear last saved file when new source is picked
+            _lastSavedFileUri.value = null
         }
     }
 
@@ -82,7 +80,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         _selectedTargetColumns.value = emptySet()
         _selectedUuidColumns.value = emptySet()
         _selectedRandomizeColumns.value = emptySet()
-        _lastSavedFileUri.value = null // Also clear here
+        _lastSavedFileUri.value = null
 
         viewModelScope.launch {
             try {
@@ -102,18 +100,37 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         }
     }
 
-    // UPDATED: These functions now only update their own list.
-    // The logic to prevent dual-selection is moved to the UI layer.
+    /**
+     * Updates the set of selected columns for incrementing.
+     * Removes the selected columns from the other action lists.
+     */
     fun updateSelectedTargetColumns(newSelection: Set<String>) {
         _selectedTargetColumns.value = newSelection
+        // Remove from other lists
+        _selectedRandomizeColumns.value = _selectedRandomizeColumns.value?.minus(newSelection)
+        _selectedUuidColumns.value = _selectedUuidColumns.value?.minus(newSelection)
     }
 
+    /**
+     * Updates the set of selected columns for UUID generation.
+     * Removes the selected columns from the other action lists.
+     */
     fun updateSelectedUuidColumns(newSelection: Set<String>) {
         _selectedUuidColumns.value = newSelection
+        // Remove from other lists
+        _selectedTargetColumns.value = _selectedTargetColumns.value?.minus(newSelection)
+        _selectedRandomizeColumns.value = _selectedRandomizeColumns.value?.minus(newSelection)
     }
 
+    /**
+     * Updates the set of selected columns for randomization.
+     * Removes the selected columns from the other action lists.
+     */
     fun updateSelectedRandomizeColumns(newSelection: Set<String>) {
         _selectedRandomizeColumns.value = newSelection
+        // Remove from other lists
+        _selectedTargetColumns.value = _selectedTargetColumns.value?.minus(newSelection)
+        _selectedUuidColumns.value = _selectedUuidColumns.value?.minus(newSelection)
     }
 
     fun clearErrorMessage() { _errorMessage.value = null }
