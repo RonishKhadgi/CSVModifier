@@ -139,6 +139,17 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
                             android:text="@{`Selected: ` + (viewModel.selectedUuidColumns.empty ? `None` : TextUtils.join(`, `, viewModel.selectedUuidColumns))}" />
+
+                        <Button
+                            android:id="@+id/buttonClearSelections"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="end"
+                            android:layout_marginTop="8dp"
+                            android:text="Clear All"
+                            app:icon="@drawable/ic_clear"
+                            android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"/>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

@@ -40,8 +40,6 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     val selectedUuidColumns: LiveData<Set<String>> get() = _selectedUuidColumns
     private val _selectedRandomizeColumns = MutableLiveData<Set<String>>(emptySet())
     val selectedRandomizeColumns: LiveData<Set<String>> get() = _selectedRandomizeColumns
-
-    // NEW: LiveData for the "value from list" feature
     private val _selectedValueFromListColumns = MutableLiveData<Map<String, List<String>>>(emptyMap())
     val selectedValueFromListColumns: LiveData<Map<String, List<String>>> get() = _selectedValueFromListColumns
 
@@ -53,11 +51,8 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     fun setSelectedFile(fileName: String?) {
         savedStateHandle["selectedFileNameKey"] = fileName
         if (fileName == null) {
+            clearAllSelections() // Use the new function to reset everything
             _csvHeaders.value = null
-            _selectedTargetColumns.value = emptySet()
-            _selectedUuidColumns.value = emptySet()
-            _selectedRandomizeColumns.value = emptySet()
-            _selectedValueFromListColumns.value = emptyMap()
             _lastSavedFileUri.value = null
         }
     }
@@ -71,18 +66,12 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         }
         _isLoadingHeaders.value = true
         _errorMessage.value = null
-        // Clear all selections when a new file is loaded
-        _selectedTargetColumns.value = emptySet()
-        _selectedUuidColumns.value = emptySet()
-        _selectedRandomizeColumns.value = emptySet()
-        _selectedValueFromListColumns.value = emptyMap()
+        clearAllSelections() // Also clear selections when new headers are loaded
         _lastSavedFileUri.value = null
 
         viewModelScope.launch {
             try {
-                val headerResult = withContext(Dispatchers.IO) {
-                    processor.readCsvHeader(inputStream)
-                }
+                val headerResult = withContext(Dispatchers.IO) { processor.readCsvHeader(inputStream) }
                 headerResult.fold(
                     onSuccess = { headers -> _csvHeaders.value = headers.sorted() },
                     onFailure = { error ->
@@ -94,8 +83,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         }
     }
 
-    // Helper to remove a key from all other selection lists
-    private fun clearColumnFromOtherSelections(columnName: String, skipList: MutableLiveData<*>) {
+    private fun clearColumnFromOtherSelections(columnName: String, skipList: LiveData<*>) {
         if (_selectedTargetColumns != skipList) _selectedTargetColumns.value = _selectedTargetColumns.value?.minus(columnName)
         if (_selectedUuidColumns != skipList) _selectedUuidColumns.value = _selectedUuidColumns.value?.minus(columnName)
         if (_selectedRandomizeColumns != skipList) _selectedRandomizeColumns.value = _selectedRandomizeColumns.value?.minus(columnName)
@@ -124,6 +112,14 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         val newMap = (_selectedValueFromListColumns.value ?: emptyMap()).toMutableMap()
         newMap.remove(columnName)
         _selectedValueFromListColumns.value = newMap
+    }
+
+    // NEW FUNCTION to clear all selections at once
+    fun clearAllSelections() {
+        _selectedValueFromListColumns.value = emptyMap()
+        _selectedTargetColumns.value = emptySet()
+        _selectedRandomizeColumns.value = emptySet()
+        _selectedUuidColumns.value = emptySet()
     }
 
     fun clearErrorMessage() { _errorMessage.value = null }

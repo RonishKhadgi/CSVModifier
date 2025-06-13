@@ -123,6 +123,13 @@ class OptionsActivity : AppCompatActivity() {
                     (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet())
             showColumnSelectionDialog("Select Columns for NEW UUIDs", viewModel.selectedUuidColumns.value ?: emptySet(), disabledCols) { viewModel.updateSelectedUuidColumns(it) }
         }
+
+        // NEW: Click listener for the clear button
+        binding.buttonClearSelections.setOnClickListener {
+            viewModel.clearAllSelections()
+            Toast.makeText(this, "All column selections cleared.", Toast.LENGTH_SHORT).show()
+        }
+
         binding.buttonProcessAndSave.setOnClickListener {
             val suggestedName = viewModel.selectedFileName.value?.let { "processed_$it" } ?: "processed_output.csv"
             fileSaverLauncher.launch(suggestedName)
@@ -241,7 +248,7 @@ class OptionsActivity : AppCompatActivity() {
                 if (values.isNotEmpty()) {
                     viewModel.updateValueFromListColumn(columnName, values)
                 } else {
-                    viewModel.removeValueFromListColumn(columnName) // Remove if list is empty
+                    viewModel.removeValueFromListColumn(columnName)
                 }
             }
             .setNegativeButton("Clear") { _, _ ->
