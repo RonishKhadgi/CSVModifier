@@ -4,9 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
-        <variable
-            name="viewModel"
-            type="com.example.csvmodifier.viewmodel.MainViewModel" />
+        <variable name="viewModel" type="com.example.csvmodifier.viewmodel.MainViewModel" />
         <import type="android.view.View"/>
         <import type="android.text.TextUtils"/>
     </data>
@@ -19,13 +17,11 @@
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
-
             <com.google.android.material.appbar.MaterialToolbar
                 android:id="@+id/toolbar"
                 android:layout_width="match_parent"
                 android:layout_height="?attr/actionBarSize"
                 app:title="Processing Options" />
-
         </com.google.android.material.appbar.AppBarLayout>
 
         <androidx.core.widget.NestedScrollView
@@ -40,7 +36,6 @@
                 android:padding="16dp"
                 tools:context=".view.OptionsActivity">
 
-                <!-- File Info Card -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardFileInfo"
                     android:layout_width="0dp"
@@ -68,7 +63,6 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Column Selection Card -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardColumnSelection"
                     android:layout_width="0dp"
@@ -84,10 +78,26 @@
                         android:padding="16dp">
 
                         <Button
+                            android:id="@+id/buttonSelectValueFromList"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Select Column for List Values"
+                            app:icon="@drawable/ic_list"
+                            android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"/>
+                        <TextView
+                            android:id="@+id/textViewSelectedValueFromList"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@{`Selected: ` + (viewModel.selectedValueFromListColumns.empty ? `None` : TextUtils.join(`, `, viewModel.selectedValueFromListColumns.keySet()))}" />
+
+                        <Button
                             android:id="@+id/buttonSelectTargetColumns"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
                             android:text="Select Columns for Increment/Date"
                             app:icon="@drawable/ic_edit"
                             android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"/>
@@ -129,10 +139,20 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
                             android:text="@{`Selected: ` + (viewModel.selectedUuidColumns.empty ? `None` : TextUtils.join(`, `, viewModel.selectedUuidColumns))}" />
+
+                        <Button
+                            android:id="@+id/buttonClearSelections"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="end"
+                            android:layout_marginTop="8dp"
+                            android:text="Clear All"
+                            app:icon="@drawable/ic_clear"
+                            android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"/>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Generation Settings Card -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardGenerationSettings"
                     android:layout_width="0dp"
@@ -229,7 +249,6 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Process Button -->
                 <Button
                     android:id="@+id/buttonProcessAndSave"
                     android:layout_width="0dp"
@@ -241,15 +260,27 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
 
-                <!-- Status Display -->
+                <Button
+                    android:id="@+id/buttonShare"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Share Last Saved File"
+                    app:icon="@android:drawable/ic_menu_share"
+                    android:visibility="@{viewModel.lastSavedFileUri != null ? View.VISIBLE : View.GONE}"
+                    app:layout_constraintTop_toBottomOf="@id/buttonProcessAndSave"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
                 <TextView
                     android:id="@+id/textViewStatus"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="8dp"
                     android:text="@{viewModel.processingStatus}"
                     android:gravity="center"
-                    app:layout_constraintTop_toBottomOf="@id/buttonProcessAndSave"
+                    app:layout_constraintTop_toBottomOf="@id/buttonShare"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
 

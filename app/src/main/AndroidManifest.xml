@@ -10,7 +10,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.CSVModifier"> <!-- Use NoActionBar theme -->
+        android:theme="@style/Theme.CSVModifier"> <!-- Make sure this points to your NoActionBar theme if you have one -->
 
         <activity
             android:name=".view.MainActivity"
@@ -21,15 +21,21 @@
             </intent-filter>
         </activity>
 
-        <!-- NEW: Declare the OptionsActivity -->
         <activity
             android:name=".view.OptionsActivity"
             android:exported="false" />
 
+        <!-- NEW: Declare the FileProvider for sharing files securely -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 
 </manifest>
-
-
-
-
