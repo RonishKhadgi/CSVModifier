@@ -108,7 +108,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:text="Select Columns for Increment/Date"
+                            android:text="Select Columns To Increment"
                             app:icon="@drawable/ic_edit"
                             android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"/>
                         <TextView

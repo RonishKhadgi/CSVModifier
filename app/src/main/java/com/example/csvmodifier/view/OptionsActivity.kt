@@ -8,7 +8,6 @@ import android.provider.OpenableColumns
 import android.text.InputType
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.View
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
@@ -28,6 +27,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 
 class OptionsActivity : AppCompatActivity() {
 
@@ -76,32 +78,11 @@ class OptionsActivity : AppCompatActivity() {
         loadInitialFileInfo(sourceFileUri!!)
         setupUIListeners()
         setupObservers()
-
-        // Start on Step 1
-        showStep1()
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        // Handle hardware/toolbar back press for Step 2
-        if (binding.groupStep2.visibility == View.VISIBLE) {
-            showStep1()
-            return false // We've handled it, don't close the activity
-        }
-        // If on Step 1, proceed with default back behavior (close activity)
         onBackPressedDispatcher.onBackPressed()
         return true
-    }
-
-    private fun showStep1() {
-        binding.groupStep1.visibility = View.VISIBLE
-        binding.groupStep2.visibility = View.GONE
-        supportActionBar?.title = "Step 1: Select Columns"
-    }
-
-    private fun showStep2() {
-        binding.groupStep1.visibility = View.GONE
-        binding.groupStep2.visibility = View.VISIBLE
-        supportActionBar?.title = "Step 2: Set Options"
     }
 
     private fun loadInitialFileInfo(uri: Uri) {
@@ -121,31 +102,41 @@ class OptionsActivity : AppCompatActivity() {
     }
 
     private fun setupUIListeners() {
-        // Step 1 buttons
-        binding.buttonSelectValueFromList.setOnClickListener { showValueFromListSelectionDialog() }
+        binding.buttonSelectValueFromList.setOnClickListener {
+            showValueFromListSelectionDialog()
+        }
+        // SIMPLIFIED: No longer need to calculate disabled columns here.
         binding.buttonSelectTargetColumns.setOnClickListener {
-            val disabledCols = (viewModel.selectedRandomizeColumns.value ?: emptySet()) + (viewModel.selectedUuidColumns.value ?: emptySet()) + (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet())
-            showColumnSelectionDialog("Select Columns for Increment/Date", viewModel.selectedTargetColumns.value ?: emptySet(), disabledCols) { viewModel.updateSelectedTargetColumns(it) }
+            showColumnSelectionDialog(
+                "Select Columns for Increment/Date",
+                viewModel.selectedTargetColumns.value ?: emptySet()
+            ) { viewModel.updateSelectedTargetColumns(it) }
         }
         binding.buttonSelectRandomizeColumns.setOnClickListener {
-            val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) + (viewModel.selectedUuidColumns.value ?: emptySet()) + (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet())
-            showColumnSelectionDialog("Select Columns to Randomize", viewModel.selectedRandomizeColumns.value ?: emptySet(), disabledCols) { viewModel.updateSelectedRandomizeColumns(it) }
+            showColumnSelectionDialog(
+                "Select Columns to Randomize",
+                viewModel.selectedRandomizeColumns.value ?: emptySet()
+            ) { viewModel.updateSelectedRandomizeColumns(it) }
         }
         binding.buttonSelectUuidColumns.setOnClickListener {
-            val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) + (viewModel.selectedRandomizeColumns.value ?: emptySet()) + (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet())
-            showColumnSelectionDialog("Select Columns for NEW UUIDs", viewModel.selectedUuidColumns.value ?: emptySet(), disabledCols) { viewModel.updateSelectedUuidColumns(it) }
+            showColumnSelectionDialog(
+                "Select Columns for NEW UUIDs",
+                viewModel.selectedUuidColumns.value ?: emptySet()
+            ) { viewModel.updateSelectedUuidColumns(it) }
         }
-        binding.buttonClearSelections.setOnClickListener { viewModel.clearAllSelections(); Toast.makeText(this, "Selections cleared.", Toast.LENGTH_SHORT).show() }
-        binding.buttonNext.setOnClickListener { showStep2() }
 
-        // Step 2 buttons
-        binding.buttonBack.setOnClickListener { showStep1() }
+        binding.buttonClearSelections.setOnClickListener {
+            viewModel.clearAllSelections()
+            Toast.makeText(this, "Selections cleared.", Toast.LENGTH_SHORT).show()
+        }
+
         binding.buttonProcessAndSave.setOnClickListener {
             val suggestedName = viewModel.selectedFileName.value?.let { "processed_$it" } ?: "processed_output.csv"
             fileSaverLauncher.launch(suggestedName)
         }
         binding.buttonShare.setOnClickListener {
-            viewModel.lastSavedFileUri.value?.let { uri -> shareFile(uri) } ?: Toast.makeText(this, "No saved file to share.", Toast.LENGTH_SHORT).show()
+            viewModel.lastSavedFileUri.value?.let { uri -> shareFile(uri) }
+                ?: Toast.makeText(this, "No saved file to share.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -185,8 +176,9 @@ class OptionsActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val totalRowsResult = withContext(Dispatchers.IO) {
-                try { viewModel.processor.countRows(contentResolver.openInputStream(sourceUri)!!) }
-                catch (e: Exception) { Result.failure<Int>(e) }
+                try {
+                    viewModel.processor.countRows(contentResolver.openInputStream(sourceUri)!!)
+                } catch (e: Exception) { Result.failure<Int>(e) }
             }
 
             if (totalRowsResult.isFailure) {
@@ -224,10 +216,9 @@ class OptionsActivity : AppCompatActivity() {
     private fun showValueFromListSelectionDialog() {
         val allHeaders = viewModel.csvHeaders.value ?: return
         val currentListSelections = viewModel.selectedValueFromListColumns.value ?: emptyMap()
-        val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) +
-                (viewModel.selectedRandomizeColumns.value ?: emptySet()) +
-                (viewModel.selectedUuidColumns.value ?: emptySet())
-        val availableItems = allHeaders.filter { it !in disabledCols || currentListSelections.containsKey(it) }.toTypedArray()
+        // No need to disable columns if ViewModel handles reassignment. All columns are available to be chosen.
+        val availableItems = allHeaders.toTypedArray()
+
         AlertDialog.Builder(this)
             .setTitle("Select Column for List Values")
             .setItems(availableItems) { _, which ->
@@ -256,18 +247,31 @@ class OptionsActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showColumnSelectionDialog(title: String, currentSelection: Set<String>, disabledByOtherActions: Set<String>, onConfirm: (Set<String>) -> Unit) {
-        val allHeaders = viewModel.csvHeaders.value ?: return
-        val availableItems = allHeaders.filter { it !in disabledByOtherActions }.toTypedArray()
-        val checkedItems = BooleanArray(availableItems.size) { availableItems[it] in currentSelection }
+    // SIMPLIFIED: No longer needs to check for disabled items, as the ViewModel handles it.
+    private fun showColumnSelectionDialog(
+        title: String,
+        currentSelection: Set<String>,
+        onConfirm: (Set<String>) -> Unit
+    ) {
+        val availableHeaders = viewModel.csvHeaders.value
+        if (availableHeaders.isNullOrEmpty()) {
+            Toast.makeText(this, "Headers not available.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val items = availableHeaders.toTypedArray()
+        val checkedItems = BooleanArray(items.size) { items[it] in currentSelection }
+
         AlertDialog.Builder(this)
             .setTitle(title)
-            .setMultiChoiceItems(availableItems, checkedItems) { _, _, _ -> }
+            .setMultiChoiceItems(items, checkedItems) { _, _, _ ->
+                // The dialog handles visual checking/unchecking.
+            }
             .setPositiveButton("OK") { dialog, _ ->
                 val selected = mutableSetOf<String>()
                 val listView = (dialog as AlertDialog).listView
                 for (i in 0 until listView.count) {
-                    if (listView.isItemChecked(i)) { selected.add(availableItems[i]) }
+                    if (listView.isItemChecked(i)) { selected.add(items[i]) }
                 }
                 onConfirm(selected)
                 dialog.dismiss()
@@ -276,58 +280,8 @@ class OptionsActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showLoadingDialog() {
-        if (loadingDialog == null) {
-            val builder = AlertDialog.Builder(this)
-            val inflater = LayoutInflater.from(this)
-            val view = inflater.inflate(R.layout.dialog_loading, null)
-            progressTextView = view.findViewById(R.id.textViewProgress)
-            builder.setView(view)
-            builder.setCancelable(false)
-            loadingDialog = builder.create()
-        }
-        progressTextView?.text = ""
-        loadingDialog?.show()
-    }
-
-    private fun hideLoadingDialog() {
-        loadingDialog?.dismiss()
-    }
-
-    private fun shareFile(fileUri: Uri) {
-        try {
-            val inputStream = contentResolver.openInputStream(fileUri)
-            val originalFileName = viewModel.selectedFileName.value ?: "shared_file.csv"
-            val tempFile = File(cacheDir, originalFileName)
-            val outputStream = FileOutputStream(tempFile)
-
-            inputStream?.copyTo(outputStream)
-            inputStream?.close()
-            outputStream.close()
-
-            val shareUri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.provider", tempFile)
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/csv"
-                putExtra(Intent.EXTRA_STREAM, shareUri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(Intent.createChooser(shareIntent, "Share CSV File"))
-        } catch (ex: Exception) {
-            Log.e(TAG, "Error sharing file via cache", ex)
-            Toast.makeText(this, "Failed to share file: ${ex.message}", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun setupObservers() {
-        viewModel.errorMessage.observe(this) { message ->
-            message?.let {
-                hideLoadingDialog()
-                Toast.makeText(this, it, Toast.LENGTH_LONG).show()
-                viewModel.clearErrorMessage()
-            }
-        }
-        viewModel.progressText.observe(this) { progress ->
-            progressTextView?.text = progress
-        }
-    }
+    private fun showLoadingDialog() { }
+    private fun hideLoadingDialog() {  }
+    private fun shareFile(fileUri: Uri) {  }
+    private fun setupObservers() {  }
 }
