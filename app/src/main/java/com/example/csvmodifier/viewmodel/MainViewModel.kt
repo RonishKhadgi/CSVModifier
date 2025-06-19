@@ -17,18 +17,15 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
 
     val processor = CsvDataProcessor()
 
+    // All existing LiveData...
     private val _processingStatus = MutableLiveData<String>()
     val processingStatus: LiveData<String> get() = _processingStatus
-
     private val _errorMessage = MutableLiveData<String?>()
     val errorMessage: LiveData<String?> get() = _errorMessage
-
     private val _progressText = MutableLiveData<String>()
     val progressText: LiveData<String> get() = _progressText
-
     private val _lastSavedFileUri = MutableLiveData<Uri?>()
     val lastSavedFileUri: LiveData<Uri?> get() = _lastSavedFileUri
-
     val selectedFileName: LiveData<String?> = savedStateHandle.getLiveData<String?>("selectedFileNameKey")
     private val _csvHeaders = MutableLiveData<List<String>?>(null)
     val csvHeaders: LiveData<List<String>?> get() = _csvHeaders
@@ -43,6 +40,10 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     private val _selectedValueFromListColumns = MutableLiveData<Map<String, List<String>>>(emptyMap())
     val selectedValueFromListColumns: LiveData<Map<String, List<String>>> get() = _selectedValueFromListColumns
 
+    // NEW: LiveData for deletion features
+    private val _selectedDeleteColumns = MutableLiveData<Set<String>>(emptySet())
+    val selectedDeleteColumns: LiveData<Set<String>> get() = _selectedDeleteColumns
+
     fun setProcessingStatus(status: String) { _processingStatus.postValue(status) }
     fun setErrorMessage(message: String?) { _errorMessage.postValue(message) }
     fun updateProgress(text: String) { _progressText.postValue(text) }
@@ -51,7 +52,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     fun setSelectedFile(fileName: String?) {
         savedStateHandle["selectedFileNameKey"] = fileName
         if (fileName == null) {
-            clearAllSelections() // Use the new function to reset everything
+            clearAllSelections()
             _csvHeaders.value = null
             _lastSavedFileUri.value = null
         }
@@ -66,7 +67,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         }
         _isLoadingHeaders.value = true
         _errorMessage.value = null
-        clearAllSelections() // Also clear selections when new headers are loaded
+        clearAllSelections()
         _lastSavedFileUri.value = null
 
         viewModelScope.launch {
@@ -88,6 +89,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         if (_selectedUuidColumns != skipList) _selectedUuidColumns.value = _selectedUuidColumns.value?.minus(columnName)
         if (_selectedRandomizeColumns != skipList) _selectedRandomizeColumns.value = _selectedRandomizeColumns.value?.minus(columnName)
         if (_selectedValueFromListColumns != skipList) _selectedValueFromListColumns.value = _selectedValueFromListColumns.value?.minus(columnName)
+        if (_selectedDeleteColumns != skipList) _selectedDeleteColumns.value = _selectedDeleteColumns.value?.minus(columnName)
     }
 
     fun updateSelectedTargetColumns(newSelection: Set<String>) {
@@ -113,14 +115,17 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         newMap.remove(columnName)
         _selectedValueFromListColumns.value = newMap
     }
+    fun updateSelectedDeleteColumns(newSelection: Set<String>) {
+        newSelection.forEach { clearColumnFromOtherSelections(it, _selectedDeleteColumns) }
+        _selectedDeleteColumns.value = newSelection
+    }
 
-    // NEW FUNCTION to clear all selections at once
     fun clearAllSelections() {
         _selectedValueFromListColumns.value = emptyMap()
         _selectedTargetColumns.value = emptySet()
         _selectedRandomizeColumns.value = emptySet()
         _selectedUuidColumns.value = emptySet()
+        _selectedDeleteColumns.value = emptySet()
     }
-
     fun clearErrorMessage() { _errorMessage.value = null }
 }
