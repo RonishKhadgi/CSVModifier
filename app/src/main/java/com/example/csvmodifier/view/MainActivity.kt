@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "File selected with URI: $uri. Launching OptionsActivity.")
             val intent = Intent(this, OptionsActivity::class.java).apply {
                 putExtra(OptionsActivity.EXTRA_FILE_URI, uri.toString())
-            }
+             }
             startActivity(intent)
         }
 
