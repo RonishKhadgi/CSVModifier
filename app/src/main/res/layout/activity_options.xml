@@ -151,6 +151,22 @@
                             android:text="@{`Selected: ` + (viewModel.selectedUuidColumns.empty ? `None` : TextUtils.join(`, `, viewModel.selectedUuidColumns))}" />
 
                         <Button
+                            android:id="@+id/buttonSelectDeleteColumns"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Select Columns to Delete"
+                            app:icon="@drawable/ic_delete"
+                            android:enabled="@{viewModel.csvHeaders != null &amp;&amp; !viewModel.csvHeaders.empty}"/>
+                        <TextView
+                            android:id="@+id/textViewSelectedDeleteColumns"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@{`Selected: ` + (viewModel.selectedDeleteColumns.empty ? `None` : TextUtils.join(`, `, viewModel.selectedDeleteColumns))}" />
+
+                        <Button
                             android:id="@+id/buttonClearSelections"
                             style="@style/Widget.MaterialComponents.Button.TextButton"
                             android:layout_width="wrap_content"
@@ -238,6 +254,22 @@
                                 android:text="1"
                                 android:hint="Number Increment Step"
                                 android:inputType="number"/>
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <!-- UPDATED: This field is now disabled when the switch is on -->
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/textFieldDeleteRows"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:enabled="@{!switchFirstRowOnly.checked}"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/editTextDeleteRows"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="Row range to delete (e.g., 5-50)"
+                                android:inputType="text"/>
                         </com.google.android.material.textfield.TextInputLayout>
 
                         <TextView

@@ -73,19 +73,23 @@ class CsvDataProcessor {
         incrementColumnNames: List<String>,
         uuidColumnNames: Set<String>,
         randomizeColumnNames: Set<String>,
-        valueFromListMap: Map<String, List<String>>, // Parameter for the new feature
+        valueFromListMap: Map<String, List<String>>,
+        deleteColumnNames: Set<String>,
+        deleteRowRange: IntRange?,      // UPDATED: Now accepts a nullable IntRange
         generateFromFirstRowOnly: Boolean,
         timestampIncrementMode: TimestampIncrementMode,
         onProgress: (Int) -> Unit
     ): Result<Long> {
         var totalRowsWritten = 0L
-        Log.d(TAG, "Starting CSV STREAMING. Date Step: $dateIncrementStep, Number Step: $numberIncrementStep")
 
         try {
             csvReader().open(sourceStream) {
                 csvWriter().open(destinationStream) {
                     val header = readNext() ?: throw IOException("CSV file is empty or missing a header.")
-                    writeRow(header)
+
+                    val indicesToDelete = deleteColumnNames.map { header.indexOf(it) }.filter { it != -1 }.toSet()
+                    val newHeader = header.filterIndexed { index, _ -> index !in indicesToDelete }
+                    writeRow(newHeader)
                     totalRowsWritten++
 
                     val incrementIndices = incrementColumnNames.mapNotNull { name -> header.indexOf(name.trim()).takeIf { it != -1 }?.let { Pair(name.trim(), it) } }
@@ -96,13 +100,20 @@ class CsvDataProcessor {
                     if (generateFromFirstRowOnly) {
                         val firstDataRow = readNext()
                         if (firstDataRow != null) {
-                            writeRow(firstDataRow)
-                            totalRowsWritten++
-                            for (i in 1..rowsToAdd) {
-                                onProgress(i)
-                                val newRow = createNewRow(firstDataRow, i, dateIncrementStep, numberIncrementStep, incrementIndices, uuidIndices, randomizeIndices, listValueIndices, timestampIncrementMode)
-                                writeRow(newRow)
+                            // Check if the first data row (row #1) should be deleted
+                            if (deleteRowRange == null || 1 !in deleteRowRange) {
+                                val filteredOriginalRow = firstDataRow.filterIndexed { index, _ -> index !in indicesToDelete }
+                                writeRow(filteredOriginalRow)
                                 totalRowsWritten++
+                                for (i in 1..rowsToAdd) {
+                                    onProgress(i)
+                                    val newRow = createNewRow(firstDataRow, i, dateIncrementStep, numberIncrementStep, incrementIndices, uuidIndices, randomizeIndices, listValueIndices, timestampIncrementMode)
+                                    val filteredNewRow = newRow.filterIndexed { index, _ -> index !in indicesToDelete }
+                                    writeRow(filteredNewRow)
+                                    totalRowsWritten++
+                                }
+                            } else {
+                                Log.d(TAG, "Deleting data row #1 as it is within the specified range.")
                             }
                         }
                     } else {
@@ -111,13 +122,21 @@ class CsvDataProcessor {
                         while (originalRow != null) {
                             originalRowIndex++
                             onProgress(originalRowIndex)
-                            val currentRow = originalRow
-                            writeRow(currentRow)
-                            totalRowsWritten++
-                            for (i in 1..rowsToAdd) {
-                                val newRow = createNewRow(currentRow, i, dateIncrementStep, numberIncrementStep, incrementIndices, uuidIndices, randomizeIndices, listValueIndices, timestampIncrementMode)
-                                writeRow(newRow)
+
+                            // UPDATED: Check if the current row index is within the delete range
+                            if (deleteRowRange == null || originalRowIndex !in deleteRowRange) {
+                                val currentRow = originalRow
+                                val filteredCurrentRow = currentRow.filterIndexed { index, _ -> index !in indicesToDelete }
+                                writeRow(filteredCurrentRow)
                                 totalRowsWritten++
+                                for (i in 1..rowsToAdd) {
+                                    val newRow = createNewRow(currentRow, i, dateIncrementStep, numberIncrementStep, incrementIndices, uuidIndices, randomizeIndices, listValueIndices, timestampIncrementMode)
+                                    val filteredNewRow = newRow.filterIndexed { index, _ -> index !in indicesToDelete }
+                                    writeRow(filteredNewRow)
+                                    totalRowsWritten++
+                                }
+                            } else {
+                                Log.d(TAG, "Deleting data row #$originalRowIndex as it is within the specified range.")
                             }
                             originalRow = readNext()
                         }
