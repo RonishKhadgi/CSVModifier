@@ -10,7 +10,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.CSVModifier"> <!-- Make sure this points to your NoActionBar theme if you have one -->
+        android:theme="@style/Theme.CSVModifier">
 
         <activity
             android:name=".view.MainActivity"
