@@ -172,7 +172,7 @@ class OptionsActivity : AppCompatActivity() {
         }
         binding.buttonLoadToVault.setOnClickListener {
             binding.buttonLoadToVault.setOnClickListener {
-                // NEW: Launch the dedicated VeevaUploadActivity instead of showing a dialog
+                // Launch the dedicated VeevaUploadActivity instead of showing a dialog
                 val savedFileUri = viewModel.lastSavedFileUri.value
                 if (savedFileUri != null) {
                     val intent = Intent(this, VeevaUploadActivity::class.java).apply {

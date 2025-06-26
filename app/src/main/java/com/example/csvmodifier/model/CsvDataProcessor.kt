@@ -74,7 +74,7 @@ class CsvDataProcessor {
         randomizeColumnNames: Set<String>,
         valueFromListMap: Map<String, List<String>>,
         deleteColumnNames: Set<String>,
-        deleteRowRange: IntRange?,      // UPDATED: Now accepts a nullable IntRange
+        deleteRowRange: IntRange?,
         generateFromFirstRowOnly: Boolean,
         timestampIncrementMode: TimestampIncrementMode,
         onProgress: (Int) -> Unit
@@ -122,7 +122,7 @@ class CsvDataProcessor {
                             originalRowIndex++
                             onProgress(originalRowIndex)
 
-                            // UPDATED: Check if the current row index is within the delete range
+                            // Check if the current row index is within the delete range
                             if (deleteRowRange == null || originalRowIndex !in deleteRowRange) {
                                 val currentRow = originalRow
                                 val filteredCurrentRow = currentRow.filterIndexed { index, _ -> index !in indicesToDelete }
@@ -161,7 +161,7 @@ class CsvDataProcessor {
         incrementIndices: List<Pair<String, Int>>,
         uuidIndices: Set<Int>,
         randomizeIndices: Set<Int>,
-        listValueIndices: Map<Int, List<String>>, // Parameter for the new feature
+        listValueIndices: Map<Int, List<String>>,
         timestampIncrementMode: TimestampIncrementMode
     ): List<String> {
         val newRow = templateRow.toMutableList()
@@ -210,7 +210,7 @@ class CsvDataProcessor {
             } catch (e: DateTimeParseException) { /* Try next */ }
         }
 
-        // REVERTED to PREFIXNUMBER randomization logic.
+        //PREFIXNUMBER randomization logic.
         val regex = Regex("^(.*?)(\\d+)$")
         val matchResult = regex.matchEntire(trimmedValue)
         if (matchResult != null) {
