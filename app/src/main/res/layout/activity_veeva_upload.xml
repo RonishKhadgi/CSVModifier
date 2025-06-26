@@ -119,7 +119,27 @@
                         android:layout_height="wrap_content"
                         android:checked="true"
                         android:text="Upsert" />
+                    <RadioButton
+                        android:id="@+id/radioDelete"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Delete" />
                 </RadioGroup>
+
+                <!-- Key Field Input, visibility will be controlled programmatically -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/textFieldKeyField"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:visibility="visible"> <!-- Default to visible, will be hidden for Create -->
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextKeyField"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Key Field (e.g., id or external_id__c)" />
+                </com.google.android.material.textfield.TextInputLayout>
 
                 <Button
                     android:id="@+id/buttonUpload"

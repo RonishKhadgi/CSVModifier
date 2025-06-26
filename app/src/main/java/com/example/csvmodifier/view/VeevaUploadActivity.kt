@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
@@ -17,6 +18,7 @@ import com.example.csvmodifier.databinding.ActivityVeevaUploadBinding
 import com.example.csvmodifier.model.VeevaActionType
 import com.example.csvmodifier.model.VeevaApiUploader
 import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 
 class VeevaUploadActivity : AppCompatActivity() {
 
@@ -46,6 +48,11 @@ class VeevaUploadActivity : AppCompatActivity() {
         fileToUploadUri = Uri.parse(uriString)
 
         displayFileInfo(fileToUploadUri!!)
+
+        // Listener to show/hide Key Field when action type changes
+        binding.radioGroupActionType.setOnCheckedChangeListener { _, checkedId ->
+            binding.textFieldKeyField.visibility = if (checkedId == R.id.radioCreate) View.GONE else View.VISIBLE
+        }
 
         binding.buttonUpload.setOnClickListener {
             gatherCredentialsAndUpload()
@@ -77,23 +84,30 @@ class VeevaUploadActivity : AppCompatActivity() {
         val user = binding.editTextUsername.text.toString().trim()
         val pass = binding.editTextPassword.text.toString()
         val objName = binding.editTextObjectName.text.toString().trim()
+        val keyField = binding.editTextKeyField.text.toString().trim() // Read the key field
 
         val selectedActionId = binding.radioGroupActionType.checkedRadioButtonId
         val actionType = when (selectedActionId) {
             R.id.radioCreate -> VeevaActionType.CREATE
             R.id.radioUpdate -> VeevaActionType.UPDATE
+            R.id.radioDelete -> VeevaActionType.DELETE
             else -> VeevaActionType.UPSERT
         }
 
         if (dns.isEmpty() || user.isEmpty() || pass.isEmpty() || objName.isEmpty()) {
-            Toast.makeText(this, "All fields are required.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "DNS, User, Pass, and Object Name are required.", Toast.LENGTH_SHORT).show()
             return
         }
 
-        uploadToVault(dns, user, pass, objName, actionType, fileToUploadUri!!)
+        if (actionType != VeevaActionType.CREATE && keyField.isEmpty()) {
+            Toast.makeText(this, "Key Field is required for Update, Upsert, or Delete actions.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        uploadToVault(dns, user, pass, objName, actionType, keyField, fileToUploadUri!!)
     }
 
-    private fun uploadToVault(dns: String, user: String, pass: String, objName: String, action: VeevaActionType, fileUri: Uri) {
+    private fun uploadToVault(dns: String, user: String, pass: String, objName: String, action: VeevaActionType, keyField: String?, fileUri: Uri) {
         showLoadingDialog()
         binding.textViewStatus.text = "Authenticating..."
 
@@ -111,7 +125,7 @@ class VeevaUploadActivity : AppCompatActivity() {
                             }
 
                             binding.textViewStatus.text = "Uploading data..."
-                            veevaApiUploader.uploadCsv(dns, sessionId, objName, csvData, action) { uploadResult ->
+                            veevaApiUploader.uploadCsv(dns, sessionId, objName, csvData, action, keyField) { uploadResult ->
                                 runOnUiThread {
                                     hideLoadingDialog()
                                     uploadResult.fold(

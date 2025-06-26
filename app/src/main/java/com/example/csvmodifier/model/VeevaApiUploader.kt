@@ -11,7 +11,8 @@ import java.io.IOException
 enum class VeevaActionType {
     CREATE,
     UPDATE,
-    UPSERT
+    UPSERT,
+    DELETE
 }
 
 class VeevaApiUploader {
@@ -70,6 +71,7 @@ class VeevaApiUploader {
         objectName: String,
         csvData: String,
         action: VeevaActionType,
+        keyField: String?,
         callback: (Result<String>) -> Unit
     ) {
         val sanitizedDns = sanitizeDns(dns)
@@ -79,13 +81,30 @@ class VeevaApiUploader {
         Log.d(TAG, csvData)
         Log.d(TAG, "--- End CSV Data (Length: ${csvData.length}) ---")
 
+        // Build the base URL
+        var urlBuilder = HttpUrl.Builder()
+            .scheme("https")
+            .host(sanitizedDns)
+            .addPathSegments("api/v25.1/vobjects/$objectName")
+
+        // If a key field is provided for Update or Upsert, add it as a query parameter
+        if (action == VeevaActionType.UPDATE || action == VeevaActionType.UPSERT || action == VeevaActionType.DELETE) {
+            if (!keyField.isNullOrBlank()) {
+                urlBuilder.addQueryParameter("idParam", keyField)
+            } else {
+                callback(Result.failure(IllegalArgumentException("Key Field is required for $action action.")))
+                return
+            }
+        }
+
         val requestBuilder = Request.Builder()
             .url("https://$sanitizedDns/api/v25.1/vobjects/$objectName")
             .addHeader("Authorization", sessionId)
             .addHeader("Content-Type", "text/csv")
 
+        // Use POST for Create/Upsert/Delete, and PUT for Update
         when (action) {
-            VeevaActionType.CREATE, VeevaActionType.UPSERT -> {
+            VeevaActionType.CREATE, VeevaActionType.UPSERT, VeevaActionType.DELETE -> {
                 requestBuilder.post(csvData.toRequestBody("text/csv".toMediaTypeOrNull()))
             }
             VeevaActionType.UPDATE -> {

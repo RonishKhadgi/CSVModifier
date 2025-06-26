@@ -28,6 +28,7 @@ import com.example.csvmodifier.model.VeevaActionType
 import com.example.csvmodifier.model.VeevaApiUploader
 import com.example.csvmodifier.viewmodel.MainViewModel
 import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -267,11 +268,24 @@ class OptionsActivity : AppCompatActivity() {
         val dialogView = this.layoutInflater.inflate(R.layout.dialog_veeva_login, null)
         builder.setView(dialogView)
 
+        val keyFieldLayout = dialogView.findViewById<TextInputLayout>(R.id.textFieldKeyField)
+        val actionTypeGroup = dialogView.findViewById<RadioGroup>(R.id.radioGroupActionType)
+
+        // Show/hide Key Field based on initial selection
+        val initialActionId = actionTypeGroup.checkedRadioButtonId
+        keyFieldLayout.visibility = if (initialActionId == R.id.radioCreate) View.GONE else View.VISIBLE
+
+        // Listener to show/hide Key Field when action type changes
+        actionTypeGroup.setOnCheckedChangeListener { _, checkedId ->
+            keyFieldLayout.visibility = if (checkedId == R.id.radioCreate) View.GONE else View.VISIBLE
+        }
+
         builder.setPositiveButton("Upload") { dialog, _ ->
             val dns = dialogView.findViewById<TextInputEditText>(R.id.editTextVaultDns).text.toString().trim()
             val user = dialogView.findViewById<TextInputEditText>(R.id.editTextUsername).text.toString().trim()
             val pass = dialogView.findViewById<TextInputEditText>(R.id.editTextPassword).text.toString()
             val objName = dialogView.findViewById<TextInputEditText>(R.id.editTextObjectName).text.toString().trim()
+            val keyField = dialogView.findViewById<TextInputEditText>(R.id.editTextKeyField).text.toString().trim()
 
             val selectedActionId = dialogView.findViewById<RadioGroup>(R.id.radioGroupActionType).checkedRadioButtonId
             val actionType = when (selectedActionId) {
@@ -280,25 +294,28 @@ class OptionsActivity : AppCompatActivity() {
                 else -> VeevaActionType.UPSERT
             }
 
+            // Validation
             if (dns.isEmpty() || user.isEmpty() || pass.isEmpty() || objName.isEmpty()) {
-                Toast.makeText(this, "All fields are required.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "DNS, User, Pass, and Object Name are required.", Toast.LENGTH_SHORT).show()
+                return@setPositiveButton
+            }
+            if (actionType != VeevaActionType.CREATE && keyField.isEmpty()) {
+                Toast.makeText(this, "Key Field is required for Update, Upsert, or Delete actions.", Toast.LENGTH_SHORT).show()
                 return@setPositiveButton
             }
 
-            val savedFileUri = viewModel.lastSavedFileUri.value
-            if (savedFileUri == null) {
+            val savedFileUri = viewModel.lastSavedFileUri.value ?: run {
                 Toast.makeText(this, "No saved file found to upload.", Toast.LENGTH_SHORT).show()
                 return@setPositiveButton
             }
-
-            uploadToVault(dns, user, pass, objName, actionType, savedFileUri)
+            uploadToVault(dns, user, pass, objName, actionType, keyField, savedFileUri)
             dialog.dismiss()
         }
         builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
         builder.show()
     }
 
-    private fun uploadToVault(dns: String, user: String, pass: String, objName: String, action: VeevaActionType, fileUri: Uri) {
+    private fun uploadToVault(dns: String, user: String, pass: String, objName: String, action: VeevaActionType, keyField: String?, fileUri: Uri) {
         showLoadingDialog()
         viewModel.setProcessingStatus("Authenticating with Veeva Vault...")
 
@@ -321,7 +338,7 @@ class OptionsActivity : AppCompatActivity() {
                                 .replace(Regex("\\bTRUE\\b", RegexOption.IGNORE_CASE), "true")
                                 .replace(Regex("\\bFALSE\\b", RegexOption.IGNORE_CASE), "false")
 
-                            veevaApiUploader.uploadCsv(dns, sessionId, objName, correctedCsvData, action) { uploadResult ->
+                            veevaApiUploader.uploadCsv(dns, sessionId, objName, correctedCsvData, action, keyField) { uploadResult ->
                                 runOnUiThread {
                                     hideLoadingDialog()
                                     uploadResult.fold(
