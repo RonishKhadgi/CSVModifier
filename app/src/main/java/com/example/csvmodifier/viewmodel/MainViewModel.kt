@@ -11,20 +11,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.InputStream
+import java.io.OutputStream
 
 class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel() {
 
     val processor = CsvDataProcessor()
 
-    // All existing LiveData...
     private val _processingStatus = MutableLiveData<String>()
     val processingStatus: LiveData<String> get() = _processingStatus
+
     private val _errorMessage = MutableLiveData<String?>()
     val errorMessage: LiveData<String?> get() = _errorMessage
+
     private val _progressText = MutableLiveData<String>()
     val progressText: LiveData<String> get() = _progressText
+
     private val _lastSavedFileUri = MutableLiveData<Uri?>()
     val lastSavedFileUri: LiveData<Uri?> get() = _lastSavedFileUri
+
     val selectedFileName: LiveData<String?> = savedStateHandle.getLiveData<String?>("selectedFileNameKey")
     private val _csvHeaders = MutableLiveData<List<String>?>(null)
     val csvHeaders: LiveData<List<String>?> get() = _csvHeaders
@@ -38,10 +42,10 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     val selectedRandomizeColumns: LiveData<Set<String>> get() = _selectedRandomizeColumns
     private val _selectedValueFromListColumns = MutableLiveData<Map<String, List<String>>>(emptyMap())
     val selectedValueFromListColumns: LiveData<Map<String, List<String>>> get() = _selectedValueFromListColumns
-
-    // NEW: LiveData for deletion features
     private val _selectedDeleteColumns = MutableLiveData<Set<String>>(emptySet())
     val selectedDeleteColumns: LiveData<Set<String>> get() = _selectedDeleteColumns
+    private val _selectedBooleanColumns = MutableLiveData<Set<String>>(emptySet())
+    val selectedBooleanColumns: LiveData<Set<String>> get() = _selectedBooleanColumns
 
     fun setProcessingStatus(status: String) { _processingStatus.postValue(status) }
     fun setErrorMessage(message: String?) { _errorMessage.postValue(message) }
@@ -89,6 +93,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         if (_selectedRandomizeColumns != skipList) _selectedRandomizeColumns.value = _selectedRandomizeColumns.value?.minus(columnName)
         if (_selectedValueFromListColumns != skipList) _selectedValueFromListColumns.value = _selectedValueFromListColumns.value?.minus(columnName)
         if (_selectedDeleteColumns != skipList) _selectedDeleteColumns.value = _selectedDeleteColumns.value?.minus(columnName)
+        if (_selectedBooleanColumns != skipList) _selectedBooleanColumns.value = _selectedBooleanColumns.value?.minus(columnName)
     }
 
     fun updateSelectedTargetColumns(newSelection: Set<String>) {
@@ -118,6 +123,10 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         newSelection.forEach { clearColumnFromOtherSelections(it, _selectedDeleteColumns) }
         _selectedDeleteColumns.value = newSelection
     }
+    fun updateSelectedBooleanColumns(newSelection: Set<String>) {
+        newSelection.forEach { clearColumnFromOtherSelections(it, _selectedBooleanColumns) }
+        _selectedBooleanColumns.value = newSelection
+    }
 
     fun clearAllSelections() {
         _selectedValueFromListColumns.value = emptyMap()
@@ -125,6 +134,7 @@ class MainViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         _selectedRandomizeColumns.value = emptySet()
         _selectedUuidColumns.value = emptySet()
         _selectedDeleteColumns.value = emptySet()
+        _selectedBooleanColumns.value = emptySet()
     }
     fun clearErrorMessage() { _errorMessage.value = null }
 }

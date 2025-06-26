@@ -7,13 +7,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
 
-// Enum to represent the API action type
-enum class VeevaActionType {
-    CREATE,
-    UPDATE,
-    UPSERT,
-    DELETE
-}
+enum class VeevaActionType { CREATE, UPDATE, UPSERT, DELETE }
+
+data class VaultObject(val label: String, val name: String)
 
 class VeevaApiUploader {
 
@@ -34,31 +30,81 @@ class VeevaApiUploader {
         Log.d(TAG, "Attempting to authenticate with Vault: $sanitizedDns")
 
         client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Authentication network request failed", e)
-                callback(Result.failure(e))
-            }
-
+            override fun onFailure(call: Call, e: IOException) { callback(Result.failure(e)) }
             override fun onResponse(call: Call, response: Response) {
                 val body = response.body?.string()
                 try {
                     if (response.isSuccessful && body != null) {
                         val json = JSONObject(body)
                         if (json.optString("responseStatus") == "SUCCESS") {
-                            val sessionId = json.getString("sessionId")
-                            Log.d(TAG, "Authentication successful. Session ID obtained.")
-                            callback(Result.success(sessionId))
+                            callback(Result.success(json.getString("sessionId")))
                         } else {
                             val error = json.optJSONArray("errors")?.optJSONObject(0)?.optString("message", "Unknown API error") ?: "Unknown API error"
-                            Log.e(TAG, "Authentication API error: $error")
                             callback(Result.failure(Exception("API Error: $error")))
                         }
                     } else {
-                        Log.e(TAG, "Authentication failed with code: ${response.code}, body: $body")
                         callback(Result.failure(Exception("Authentication failed: ${response.message} (Code: ${response.code})")))
                     }
+                } catch (e: Exception) { callback(Result.failure(e)) }
+            }
+        })
+    }
+
+    fun fetchObjects(dns: String, sessionId: String, callback: (Result<List<VaultObject>>) -> Unit) {
+        val sanitizedDns = sanitizeDns(dns)
+
+        val initialUrl = "https://$sanitizedDns/api/v25.1/metadata/objects"
+        val initialRequest = Request.Builder().url(initialUrl).addHeader("Authorization", sessionId).get().build()
+
+        Log.d(TAG, "Step 1: Fetching metadata directory from URL: $initialUrl")
+
+        client.newCall(initialRequest).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) { callback(Result.failure(e)) }
+            override fun onResponse(call: Call, response: Response) {
+                val body = response.body?.string()
+                if (!response.isSuccessful || body == null) {
+                    callback(Result.failure(Exception("Step 1 failed: ${response.message}"))); return
+                }
+
+                try {
+                    val json = JSONObject(body)
+                    if (json.optString("responseStatus") != "SUCCESS") {
+                        callback(Result.failure(Exception("Step 1 API response was not SUCCESS"))); return
+                    }
+
+                    val vobjectsUrl = json.getJSONObject("values").getString("vobjects")
+                    Log.d(TAG, "Step 2: Fetching actual objects from URL: $vobjectsUrl")
+
+                    val finalRequest = Request.Builder().url(vobjectsUrl).addHeader("Authorization", sessionId).get().build()
+                    client.newCall(finalRequest).enqueue(object : Callback {
+                        override fun onFailure(call: Call, e: IOException) { callback(Result.failure(e)) }
+                        override fun onResponse(call: Call, finalResponse: Response) {
+                            val finalBody = finalResponse.body?.string()
+                            try {
+                                if (finalResponse.isSuccessful && finalBody != null) {
+                                    val finalJson = JSONObject(finalBody)
+                                    if (finalJson.optString("responseStatus") == "SUCCESS") {
+                                        val objectsArray = finalJson.getJSONArray("objects")
+                                        val vaultObjects = mutableListOf<VaultObject>()
+                                        for (i in 0 until objectsArray.length()) {
+                                            val obj = objectsArray.getJSONObject(i)
+
+                                            // CORRECTED: Removed the strict filter. Add all objects.
+                                            vaultObjects.add(VaultObject(label = obj.getString("label"), name = obj.getString("name")))
+                                        }
+                                        Log.d(TAG, "Successfully fetched ${vaultObjects.size} objects.")
+                                        callback(Result.success(vaultObjects.sortedBy { it.label }))
+                                    } else {
+                                        val error = finalJson.optJSONArray("errors")?.optJSONObject(0)?.optString("message", "Unknown API error") ?: "Unknown API error"
+                                        callback(Result.failure(Exception("API Error in Step 2: $error")))
+                                    }
+                                } else {
+                                    callback(Result.failure(Exception("Fetch objects (Step 2) failed: ${finalResponse.message}")))
+                                }
+                            } catch (e: Exception) { callback(Result.failure(e)) }
+                        }
+                    })
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to parse auth response", e)
                     callback(Result.failure(e))
                 }
             }
@@ -66,62 +112,34 @@ class VeevaApiUploader {
     }
 
     fun uploadCsv(
-        dns: String,
-        sessionId: String,
-        objectName: String,
-        csvData: String,
-        action: VeevaActionType,
-        keyField: String?,
-        callback: (Result<String>) -> Unit
+        dns: String, sessionId: String, objectName: String, csvData: String,
+        action: VeevaActionType, keyField: String?, callback: (Result<String>) -> Unit
     ) {
         val sanitizedDns = sanitizeDns(dns)
-
-        // NEW: Log the data we are about to send
-        Log.d(TAG, "--- CSV Data for Upload ---")
-        Log.d(TAG, csvData)
-        Log.d(TAG, "--- End CSV Data (Length: ${csvData.length}) ---")
-
-        // Build the base URL
-        var urlBuilder = HttpUrl.Builder()
+        val urlBuilder = HttpUrl.Builder()
             .scheme("https")
             .host(sanitizedDns)
             .addPathSegments("api/v25.1/vobjects/$objectName")
 
-        // If a key field is provided for Update or Upsert, add it as a query parameter
         if (action == VeevaActionType.UPDATE || action == VeevaActionType.UPSERT || action == VeevaActionType.DELETE) {
-            if (!keyField.isNullOrBlank()) {
-                urlBuilder.addQueryParameter("idParam", keyField)
-            } else {
-                callback(Result.failure(IllegalArgumentException("Key Field is required for $action action.")))
-                return
-            }
+            if (!keyField.isNullOrBlank()) { urlBuilder.addQueryParameter("idParam", keyField) }
+            else { callback(Result.failure(IllegalArgumentException("Key Field is required for $action action."))); return }
         }
 
         val requestBuilder = Request.Builder()
-            .url("https://$sanitizedDns/api/v25.1/vobjects/$objectName")
+            .url(urlBuilder.build())
             .addHeader("Authorization", sessionId)
             .addHeader("Content-Type", "text/csv")
 
-        // Use POST for Create/Upsert/Delete, and PUT for Update
         when (action) {
-            VeevaActionType.CREATE, VeevaActionType.UPSERT, VeevaActionType.DELETE -> {
-                requestBuilder.post(csvData.toRequestBody("text/csv".toMediaTypeOrNull()))
-            }
-            VeevaActionType.UPDATE -> {
-                requestBuilder.put(csvData.toRequestBody("text/csv".toMediaTypeOrNull()))
-            }
+            VeevaActionType.CREATE, VeevaActionType.UPSERT, VeevaActionType.DELETE -> requestBuilder.post(csvData.toRequestBody("text/csv".toMediaTypeOrNull()))
+            VeevaActionType.UPDATE -> requestBuilder.put(csvData.toRequestBody("text/csv".toMediaTypeOrNull()))
         }
 
-        val request = requestBuilder.build()
+        Log.d(TAG, "Attempting to upload CSV data with action: $action to URL: ${requestBuilder.build().url}")
 
-        Log.d(TAG, "Attempting to upload CSV data with action: $action")
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Upload network request failed", e)
-                callback(Result.failure(e))
-            }
-
+        client.newCall(requestBuilder.build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) { callback(Result.failure(e)) }
             override fun onResponse(call: Call, response: Response) {
                 val body = response.body?.string()
                 Log.d(TAG, "Veeva Upload Response Body: $body") // Log full response

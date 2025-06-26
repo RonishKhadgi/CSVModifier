@@ -171,7 +171,18 @@ class OptionsActivity : AppCompatActivity() {
             viewModel.lastSavedFileUri.value?.let { uri -> shareFile(uri) } ?: Toast.makeText(this, "No saved file to share.", Toast.LENGTH_SHORT).show()
         }
         binding.buttonLoadToVault.setOnClickListener {
-            showVeevaLoginDialog()
+            binding.buttonLoadToVault.setOnClickListener {
+                // NEW: Launch the dedicated VeevaUploadActivity instead of showing a dialog
+                val savedFileUri = viewModel.lastSavedFileUri.value
+                if (savedFileUri != null) {
+                    val intent = Intent(this, VeevaUploadActivity::class.java).apply {
+                        putExtra(VeevaUploadActivity.EXTRA_FILE_URI, savedFileUri.toString())
+                    }
+                    startActivity(intent)
+                } else {
+                    Toast.makeText(this, "Please process and save a file first.", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -260,104 +271,6 @@ class OptionsActivity : AppCompatActivity() {
                     viewModel.setLastSavedFile(null)
                 }
             )
-        }
-    }
-
-    private fun showVeevaLoginDialog() {
-        val builder = AlertDialog.Builder(this)
-        val dialogView = this.layoutInflater.inflate(R.layout.dialog_veeva_login, null)
-        builder.setView(dialogView)
-
-        val keyFieldLayout = dialogView.findViewById<TextInputLayout>(R.id.textFieldKeyField)
-        val actionTypeGroup = dialogView.findViewById<RadioGroup>(R.id.radioGroupActionType)
-
-        // Show/hide Key Field based on initial selection
-        val initialActionId = actionTypeGroup.checkedRadioButtonId
-        keyFieldLayout.visibility = if (initialActionId == R.id.radioCreate) View.GONE else View.VISIBLE
-
-        // Listener to show/hide Key Field when action type changes
-        actionTypeGroup.setOnCheckedChangeListener { _, checkedId ->
-            keyFieldLayout.visibility = if (checkedId == R.id.radioCreate) View.GONE else View.VISIBLE
-        }
-
-        builder.setPositiveButton("Upload") { dialog, _ ->
-            val dns = dialogView.findViewById<TextInputEditText>(R.id.editTextVaultDns).text.toString().trim()
-            val user = dialogView.findViewById<TextInputEditText>(R.id.editTextUsername).text.toString().trim()
-            val pass = dialogView.findViewById<TextInputEditText>(R.id.editTextPassword).text.toString()
-            val objName = dialogView.findViewById<TextInputEditText>(R.id.editTextObjectName).text.toString().trim()
-            val keyField = dialogView.findViewById<TextInputEditText>(R.id.editTextKeyField).text.toString().trim()
-
-            val selectedActionId = dialogView.findViewById<RadioGroup>(R.id.radioGroupActionType).checkedRadioButtonId
-            val actionType = when (selectedActionId) {
-                R.id.radioCreate -> VeevaActionType.CREATE
-                R.id.radioUpdate -> VeevaActionType.UPDATE
-                else -> VeevaActionType.UPSERT
-            }
-
-            // Validation
-            if (dns.isEmpty() || user.isEmpty() || pass.isEmpty() || objName.isEmpty()) {
-                Toast.makeText(this, "DNS, User, Pass, and Object Name are required.", Toast.LENGTH_SHORT).show()
-                return@setPositiveButton
-            }
-            if (actionType != VeevaActionType.CREATE && keyField.isEmpty()) {
-                Toast.makeText(this, "Key Field is required for Update, Upsert, or Delete actions.", Toast.LENGTH_SHORT).show()
-                return@setPositiveButton
-            }
-
-            val savedFileUri = viewModel.lastSavedFileUri.value ?: run {
-                Toast.makeText(this, "No saved file found to upload.", Toast.LENGTH_SHORT).show()
-                return@setPositiveButton
-            }
-            uploadToVault(dns, user, pass, objName, actionType, keyField, savedFileUri)
-            dialog.dismiss()
-        }
-        builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
-        builder.show()
-    }
-
-    private fun uploadToVault(dns: String, user: String, pass: String, objName: String, action: VeevaActionType, keyField: String?, fileUri: Uri) {
-        showLoadingDialog()
-        viewModel.setProcessingStatus("Authenticating with Veeva Vault...")
-
-        veevaApiUploader.authenticate(dns, user, pass) { authResult ->
-            runOnUiThread {
-                authResult.fold(
-                    onSuccess = { sessionId ->
-                        viewModel.setProcessingStatus("Reading & correcting file for upload...")
-                        try {
-                            val originalCsvData = contentResolver.openInputStream(fileUri)?.bufferedReader().use { it?.readText() }
-
-                            if (originalCsvData.isNullOrEmpty()) {
-                                hideLoadingDialog()
-                                viewModel.setErrorMessage("Failed to read saved file or file is empty.")
-                                return@runOnUiThread
-                            }
-
-                            // NEW: Correct boolean values before uploading
-                            val correctedCsvData = originalCsvData
-                                .replace(Regex("\\bTRUE\\b", RegexOption.IGNORE_CASE), "true")
-                                .replace(Regex("\\bFALSE\\b", RegexOption.IGNORE_CASE), "false")
-
-                            veevaApiUploader.uploadCsv(dns, sessionId, objName, correctedCsvData, action, keyField) { uploadResult ->
-                                runOnUiThread {
-                                    hideLoadingDialog()
-                                    uploadResult.fold(
-                                        onSuccess = { successMessage -> viewModel.setProcessingStatus(successMessage) },
-                                        onFailure = { error -> viewModel.setErrorMessage("Upload Error: ${error.message}") }
-                                    )
-                                }
-                            }
-                        } catch (e: Exception) {
-                            hideLoadingDialog()
-                            viewModel.setErrorMessage("File Read Error: ${e.message}")
-                        }
-                    },
-                    onFailure = { error ->
-                        hideLoadingDialog()
-                        viewModel.setErrorMessage("Authentication Failed: ${error.message}")
-                    }
-                )
-            }
         }
     }
 

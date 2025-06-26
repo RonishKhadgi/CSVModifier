@@ -18,31 +18,35 @@
                 app:title="Direct Upload to Vault" />
         </com.google.android.material.appbar.AppBarLayout>
 
-        <ScrollView
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-            <LinearLayout
+            <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp"
-                tools:context=".view.VeevaUploadActivity">
+                android:padding="16dp">
 
+                <!-- Step 1: Credentials -->
                 <TextView
-                    android:id="@+id/textViewSelectedFile"
+                    android:id="@+id/labelStep1"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textStyle="bold"
-                    tools:text="Selected File: my_data.csv" />
+                    android:text="Step 1: Authenticate"
+                    android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"/>
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/textFieldVaultDns"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp">
+                    android:layout_marginTop="16dp"
+                    app:layout_constraintTop_toBottomOf="@id/labelStep1"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/editTextVaultDns"
                         android:layout_width="match_parent"
@@ -53,9 +57,12 @@
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/textFieldUsername"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp">
+                    android:layout_marginTop="8dp"
+                    app:layout_constraintTop_toBottomOf="@id/textFieldVaultDns"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/editTextUsername"
                         android:layout_width="match_parent"
@@ -66,10 +73,13 @@
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/textFieldPassword"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    app:passwordToggleEnabled="true">
+                    app:passwordToggleEnabled="true"
+                    app:layout_constraintTop_toBottomOf="@id/textFieldUsername"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/editTextPassword"
                         android:layout_width="match_parent"
@@ -78,35 +88,81 @@
                         android:inputType="textPassword" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/textFieldObjectName"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
+                <Button
+                    android:id="@+id/buttonFetchObjects"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/editTextObjectName"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Object API Name (e.g., product__v)" />
-                </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginTop="16dp"
+                    android:text="Fetch Objects"
+                    app:layout_constraintTop_toBottomOf="@id/textFieldPassword"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <!-- Step 2: Upload Options -->
+                <TextView
+                    android:id="@+id/labelStep2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="32dp"
+                    android:text="Step 2: Configure Upload"
+                    android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6"
+                    app:layout_constraintTop_toBottomOf="@id/buttonFetchObjects"
+                    app:layout_constraintStart_toStartOf="parent"/>
 
                 <TextView
+                    android:id="@+id/textViewSelectedFile"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
+                    android:textStyle="bold"
+                    tools:text="Selected File: my_data.csv"
+                    app:layout_constraintTop_toBottomOf="@id/labelStep2"
+                    app:layout_constraintStart_toStartOf="parent"/>
+
+                <TextView
+                    android:id="@+id/labelObjectType"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Object Type:"
+                    android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"
+                    app:layout_constraintTop_toBottomOf="@id/textViewSelectedFile"
+                    app:layout_constraintStart_toStartOf="parent" />
+
+                <Spinner
+                    android:id="@+id/spinnerObjectType"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@android:drawable/btn_dropdown"
+                    android:minHeight="48dp"
+                    app:layout_constraintTop_toBottomOf="@id/labelObjectType"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <TextView
+                    android:id="@+id/labelActionType"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
                     android:text="Action Type:"
-                    android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"/>
+                    android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"
+                    app:layout_constraintTop_toBottomOf="@id/spinnerObjectType"
+                    app:layout_constraintStart_toStartOf="parent"/>
 
                 <RadioGroup
                     android:id="@+id/radioGroupActionType"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:orientation="vertical"
+                    app:layout_constraintTop_toBottomOf="@id/labelActionType"
+                    app:layout_constraintStart_toStartOf="parent">
+
                     <RadioButton
                         android:id="@+id/radioCreate"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:checked="true"
                         android:text="Create" />
                     <RadioButton
                         android:id="@+id/radioUpdate"
@@ -117,7 +173,6 @@
                         android:id="@+id/radioUpsert"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:checked="true"
                         android:text="Upsert" />
                     <RadioButton
                         android:id="@+id/radioDelete"
@@ -126,14 +181,17 @@
                         android:text="Delete" />
                 </RadioGroup>
 
-                <!-- Key Field Input, visibility will be controlled programmatically -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/textFieldKeyField"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:visibility="visible"> <!-- Default to visible, will be hidden for Create -->
+                    android:visibility="gone"
+                    tools:visibility="visible"
+                    app:layout_constraintTop_toBottomOf="@id/radioGroupActionType"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/editTextKeyField"
                         android:layout_width="match_parent"
@@ -143,11 +201,14 @@
 
                 <Button
                     android:id="@+id/buttonUpload"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:text="Upload to Vault"
-                    app:icon="@drawable/ic_cloud_upload"/>
+                    app:icon="@drawable/ic_cloud_upload"
+                    app:layout_constraintTop_toBottomOf="@id/textFieldKeyField"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
 
                 <TextView
                     android:id="@+id/textViewStatus"
@@ -155,9 +216,27 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_horizontal"
                     android:layout_marginTop="16dp"
-                    tools:text="Status: Authenticating..."/>
+                    tools:text="Status: Authenticating..."
+                    app:layout_constraintTop_toBottomOf="@id/buttonUpload"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
 
-            </LinearLayout>
-        </ScrollView>
+                <!-- Groups to control visibility -->
+                <androidx.constraintlayout.widget.Group
+                    android:id="@+id/groupStep1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:constraint_referenced_ids="labelStep1,textFieldVaultDns,textFieldUsername,textFieldPassword,buttonFetchObjects"
+                    android:visibility="visible" />
+
+                <androidx.constraintlayout.widget.Group
+                    android:id="@+id/groupStep2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:constraint_referenced_ids="labelStep2,textViewSelectedFile,labelObjectType,spinnerObjectType,labelActionType,radioGroupActionType,textFieldKeyField,buttonUpload,textViewStatus"
+                    android:visibility="gone" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </androidx.core.widget.NestedScrollView>
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 </layout>
