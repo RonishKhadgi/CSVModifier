@@ -9,8 +9,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.RadioGroup
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -21,8 +19,6 @@ import com.example.csvmodifier.databinding.ActivityVeevaUploadBinding
 import com.example.csvmodifier.model.VaultObject
 import com.example.csvmodifier.model.VeevaActionType
 import com.example.csvmodifier.model.VeevaApiUploader
-import com.google.android.material.textfield.TextInputEditText
-import com.google.android.material.textfield.TextInputLayout
 
 class VeevaUploadActivity : AppCompatActivity() {
 
@@ -59,12 +55,11 @@ class VeevaUploadActivity : AppCompatActivity() {
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        // If on step 2, go back to step 1. Otherwise, close the activity.
         if (binding.groupStep2.visibility == View.VISIBLE) {
             showStep1()
             return false
         }
-        onBackPressedDispatcher.onBackPressed()
+        onBackPressed()
         return true
     }
 
@@ -121,7 +116,6 @@ class VeevaUploadActivity : AppCompatActivity() {
                                     onSuccess = { objects ->
                                         if (objects.isEmpty()) {
                                             binding.textViewStatus.text = "No loadable objects found for this user."
-                                            Toast.makeText(this, "No loadable objects found for this user.", Toast.LENGTH_LONG).show()
                                             return@fold
                                         }
                                         this.vaultObjects = objects
@@ -131,7 +125,6 @@ class VeevaUploadActivity : AppCompatActivity() {
                                     },
                                     onFailure = { error ->
                                         binding.textViewStatus.text = "Failed to fetch objects: ${error.message}"
-                                        Log.e(TAG, "Failed to fetch objects", error)
                                     }
                                 )
                             }
@@ -140,7 +133,6 @@ class VeevaUploadActivity : AppCompatActivity() {
                     onFailure = { error ->
                         hideLoadingDialog()
                         binding.textViewStatus.text = "Authentication Failed: ${error.message}"
-                        Log.e(TAG, "Authentication failed", error)
                     }
                 )
             }
@@ -156,7 +148,6 @@ class VeevaUploadActivity : AppCompatActivity() {
         binding.spinnerObjectType.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 selectedObject = vaultObjects[position]
-                Log.d(TAG, "Selected object: ${selectedObject?.label} (${selectedObject?.name})")
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {
                 selectedObject = null
@@ -190,7 +181,7 @@ class VeevaUploadActivity : AppCompatActivity() {
     }
 
     private fun uploadToVault(dns: String, user: String, pass: String, objName: String, action: VeevaActionType, keyField: String?, fileUri: Uri) {
-        showLoadingDialog("Uploading...")
+        showLoadingDialog("Authenticating...")
         binding.textViewStatus.text = "Authenticating..."
 
         veevaApiUploader.authenticate(dns, user, pass) { authResult ->
@@ -199,19 +190,20 @@ class VeevaUploadActivity : AppCompatActivity() {
                     onSuccess = { sessionId ->
                         binding.textViewStatus.text = "Reading & correcting file..."
                         try {
-                            val originalCsvData = contentResolver.openInputStream(fileUri)?.bufferedReader().use { it?.readText() }
-                            if (originalCsvData.isNullOrEmpty()) {
+                            val csvData = contentResolver.openInputStream(fileUri)?.bufferedReader().use { it?.readText() }
+                            if (csvData.isNullOrEmpty()) {
                                 hideLoadingDialog()
                                 binding.textViewStatus.text = "Error: Failed to read file or file is empty."
                                 return@runOnUiThread
                             }
 
-                            // CORRECTED: Apply the same boolean fix here
-                            val correctedCsvData = originalCsvData
+                            val correctedCsvData = csvData
                                 .replace(Regex("\\bTRUE\\b", RegexOption.IGNORE_CASE), "true")
                                 .replace(Regex("\\bFALSE\\b", RegexOption.IGNORE_CASE), "false")
 
+                            (loadingDialog?.findViewById(R.id.textViewLoading) as? TextView)?.text = "Uploading..."
                             binding.textViewStatus.text = "Uploading data..."
+
                             veevaApiUploader.uploadCsv(dns, sessionId, objName, correctedCsvData, action, keyField) { uploadResult ->
                                 runOnUiThread {
                                     hideLoadingDialog()
@@ -246,6 +238,7 @@ class VeevaUploadActivity : AppCompatActivity() {
         loadingDialog?.show()
         (loadingDialog?.findViewById(R.id.textViewLoading) as? TextView)?.text = message
     }
+
     private fun hideLoadingDialog() { loadingDialog?.dismiss() }
 
     private fun showStep1() {
@@ -253,6 +246,7 @@ class VeevaUploadActivity : AppCompatActivity() {
         binding.groupStep2.visibility = View.GONE
         supportActionBar?.title = "Step 1: Authenticate"
     }
+
     private fun showStep2() {
         binding.groupStep1.visibility = View.GONE
         binding.groupStep2.visibility = View.VISIBLE

@@ -221,6 +221,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"/>
 
+
                 <!-- Groups to control visibility -->
                 <androidx.constraintlayout.widget.Group
                     android:id="@+id/groupStep1"

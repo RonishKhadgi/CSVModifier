@@ -11,6 +11,7 @@ enum class VeevaActionType { CREATE, UPDATE, UPSERT, DELETE }
 
 data class VaultObject(val label: String, val name: String)
 
+
 class VeevaApiUploader {
 
     private val client = OkHttpClient()
@@ -49,6 +50,88 @@ class VeevaApiUploader {
             }
         })
     }
+
+    /**
+     * UPDATED: Uploads the CSV and immediately parses the synchronous response.
+     * Returns a summary string on success.
+     */
+    fun uploadCsv(
+        dns: String, sessionId: String, objectName: String, csvData: String,
+        action: VeevaActionType, keyField: String?, callback: (Result<String>) -> Unit
+    ) {
+        val sanitizedDns = sanitizeDns(dns)
+        val urlBuilder = HttpUrl.Builder()
+            .scheme("https")
+            .host(sanitizedDns)
+            .addPathSegments("api/v25.1/vobjects/$objectName")
+
+        if (action == VeevaActionType.UPDATE || action == VeevaActionType.UPSERT || action == VeevaActionType.DELETE) {
+            if (!keyField.isNullOrBlank()) { urlBuilder.addQueryParameter("idParam", keyField) }
+            else { callback(Result.failure(IllegalArgumentException("Key Field is required for $action action."))); return }
+        }
+
+        val requestBody = csvData.toRequestBody("text/csv".toMediaTypeOrNull())
+        val requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .addHeader("Authorization", sessionId)
+            .addHeader("Content-Type", "text/csv")
+
+        when (action) {
+            VeevaActionType.CREATE, VeevaActionType.UPSERT -> requestBuilder.post(requestBody)
+            VeevaActionType.UPDATE -> requestBuilder.put(requestBody)
+            VeevaActionType.DELETE -> requestBuilder.post(requestBody) // Delete also uses POST with CSV of IDs
+        }
+
+        Log.d(TAG, "Attempting to upload CSV data with action: $action to URL: ${requestBuilder.build().url}")
+
+        client.newCall(requestBuilder.build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) { callback(Result.failure(e)) }
+            override fun onResponse(call: Call, response: Response) {
+                val body = response.body?.string()
+                Log.d(TAG, "Veeva Upload Response Body: $body")
+                try {
+                    if (response.isSuccessful && body != null) {
+                        val json = JSONObject(body)
+                        if (json.optString("responseStatus") == "SUCCESS") {
+                            // The response contains an array of results for each row
+                            val dataArray = json.optJSONArray("data")
+                            if (dataArray != null) {
+                                var successCount = 0
+                                var failureCount = 0
+                                var firstError = ""
+                                for (i in 0 until dataArray.length()) {
+                                    val itemResult = dataArray.getJSONObject(i)
+                                    if (itemResult.optString("responseStatus") == "SUCCESS") {
+                                        successCount++
+                                    } else {
+                                        failureCount++
+                                        if (firstError.isEmpty()) {
+                                            firstError = itemResult.optJSONArray("errors")?.optJSONObject(0)?.optString("message", "Unknown row error.") ?: ""
+                                        }
+                                    }
+                                }
+                                val summary = "Upload Complete. Success: $successCount, Failures: $failureCount."
+                                if (failureCount > 0) {
+                                    callback(Result.failure(Exception("$summary First error: $firstError")))
+                                } else {
+                                    callback(Result.success(summary))
+                                }
+                            } else {
+                                // Fallback for responses that don't have a 'data' array but are SUCCESS
+                                callback(Result.success("Job submitted successfully (no detailed row response)."))
+                            }
+                        } else {
+                            val error = json.optJSONArray("errors")?.optJSONObject(0)?.optString("message", "Unknown API error") ?: "Unknown API error"
+                            callback(Result.failure(Exception("API Error: $error")))
+                        }
+                    } else {
+                        callback(Result.failure(Exception("Upload failed: ${response.message}")))
+                    }
+                } catch (e: Exception) { callback(Result.failure(e)) }
+            }
+        })
+    }
+
 
     fun fetchObjects(dns: String, sessionId: String, callback: (Result<List<VaultObject>>) -> Unit) {
         val sanitizedDns = sanitizeDns(dns)
@@ -105,61 +188,6 @@ class VeevaApiUploader {
                         }
                     })
                 } catch (e: Exception) {
-                    callback(Result.failure(e))
-                }
-            }
-        })
-    }
-
-    fun uploadCsv(
-        dns: String, sessionId: String, objectName: String, csvData: String,
-        action: VeevaActionType, keyField: String?, callback: (Result<String>) -> Unit
-    ) {
-        val sanitizedDns = sanitizeDns(dns)
-        val urlBuilder = HttpUrl.Builder()
-            .scheme("https")
-            .host(sanitizedDns)
-            .addPathSegments("api/v25.1/vobjects/$objectName")
-
-        if (action == VeevaActionType.UPDATE || action == VeevaActionType.UPSERT || action == VeevaActionType.DELETE) {
-            if (!keyField.isNullOrBlank()) { urlBuilder.addQueryParameter("idParam", keyField) }
-            else { callback(Result.failure(IllegalArgumentException("Key Field is required for $action action."))); return }
-        }
-
-        val requestBuilder = Request.Builder()
-            .url(urlBuilder.build())
-            .addHeader("Authorization", sessionId)
-            .addHeader("Content-Type", "text/csv")
-
-        when (action) {
-            VeevaActionType.CREATE, VeevaActionType.UPSERT, VeevaActionType.DELETE -> requestBuilder.post(csvData.toRequestBody("text/csv".toMediaTypeOrNull()))
-            VeevaActionType.UPDATE -> requestBuilder.put(csvData.toRequestBody("text/csv".toMediaTypeOrNull()))
-        }
-
-        Log.d(TAG, "Attempting to upload CSV data with action: $action to URL: ${requestBuilder.build().url}")
-
-        client.newCall(requestBuilder.build()).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) { callback(Result.failure(e)) }
-            override fun onResponse(call: Call, response: Response) {
-                val body = response.body?.string()
-                Log.d(TAG, "Veeva Upload Response Body: $body") // Log full response
-                try {
-                    if (response.isSuccessful && body != null) {
-                        val json = JSONObject(body)
-                        if (json.optString("responseStatus") == "SUCCESS") {
-                            Log.d(TAG, "Upload successful according to API response!")
-                            callback(Result.success("Successfully loaded data to Vault."))
-                        } else {
-                            val error = json.optJSONArray("errors")?.optJSONObject(0)?.optString("message", "Unknown API error") ?: "Unknown API error"
-                            Log.e(TAG, "Upload API error: $error")
-                            callback(Result.failure(Exception("API Error: $error")))
-                        }
-                    } else {
-                        Log.e(TAG, "Upload failed with code: ${response.code}, body: $body")
-                        callback(Result.failure(Exception("Upload failed: ${response.message} (Code: ${response.code})")))
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to parse upload response", e)
                     callback(Result.failure(e))
                 }
             }
