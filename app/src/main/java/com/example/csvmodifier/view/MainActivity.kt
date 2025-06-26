@@ -16,19 +16,31 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val TAG = "MainActivity"
 
-    private val filePickerLauncher =
+    // Launcher for the "Modify CSV" flow
+    private val modifyFileLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             if (uri == null) {
-                Log.w(TAG, "File selection cancelled or failed.")
-                Toast.makeText(this, "No file selected.", Toast.LENGTH_SHORT).show()
+                Log.w(TAG, "Modify file selection cancelled.")
                 return@registerForActivityResult
             }
-
-            // File was selected, launch the OptionsActivity
-            Log.d(TAG, "File selected with URI: $uri. Launching OptionsActivity.")
+            Log.d(TAG, "File selected for modification. Launching OptionsActivity.")
             val intent = Intent(this, OptionsActivity::class.java).apply {
                 putExtra(OptionsActivity.EXTRA_FILE_URI, uri.toString())
-             }
+            }
+            startActivity(intent)
+        }
+
+    // Launcher for the "Direct Upload" flow
+    private val directUploadFileLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            if (uri == null) {
+                Log.w(TAG, "Direct upload file selection cancelled.")
+                return@registerForActivityResult
+            }
+            Log.d(TAG, "File selected for direct upload. Launching VeevaUploadActivity.")
+            val intent = Intent(this, VeevaUploadActivity::class.java).apply {
+                putExtra(VeevaUploadActivity.EXTRA_FILE_URI, uri.toString())
+            }
             startActivity(intent)
         }
 
@@ -38,13 +50,25 @@ class MainActivity : AppCompatActivity() {
 
         setSupportActionBar(binding.toolbar)
 
-        binding.buttonSelectFile.setOnClickListener {
-            Log.d(TAG, "Select File button clicked. Launching file picker.")
+        // Setup listener for the "Modify" button
+        binding.buttonModifyCsv.setOnClickListener {
+            Log.d(TAG, "'Modify CSV' button clicked.")
             try {
-                filePickerLauncher.launch("*/*") // General MIME type for better compatibility
+                modifyFileLauncher.launch("*/*")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to launch file picker", e)
-                Toast.makeText(this, "Cannot open file picker. No suitable app found.", Toast.LENGTH_LONG).show()
+                Log.e(TAG, "Failed to launch file picker for modify flow", e)
+                Toast.makeText(this, "Cannot open file picker.", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        // Setup listener for the "Direct Upload" button
+        binding.buttonDirectUpload.setOnClickListener {
+            Log.d(TAG, "'Direct Upload' button clicked.")
+            try {
+                directUploadFileLauncher.launch("*/*")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to launch file picker for upload flow", e)
+                Toast.makeText(this, "Cannot open file picker.", Toast.LENGTH_LONG).show()
             }
         }
     }
