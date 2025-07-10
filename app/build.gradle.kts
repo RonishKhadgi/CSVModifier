@@ -62,11 +62,13 @@ dependencies {
     // ViewModel and LiveData
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0") // Or latest
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.0")// Or latest
+
     implementation("androidx.activity:activity-ktx:1.9.0") // For by viewModels()
 
     // Kotlin Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0") // Or latest
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0") // Or latest
+    implementation ("androidx.lifecycle:lifecycle-runtime-ktx:2.8.0") // Or a recent version
 
     // Kotlin CSV (https://github.com/doyaaaaaken/kotlin-csv)
     implementation ("com.github.doyaaaaaken:kotlin-csv-jvm:1.9.3")
@@ -76,6 +78,9 @@ dependencies {
     implementation("com.airbnb.android:lottie:6.5.0")
 
     implementation("com.google.android.material:material:1.12.0")
+
+    // For making HTTP requests to Veeva API
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

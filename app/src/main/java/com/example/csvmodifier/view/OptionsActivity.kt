@@ -10,6 +10,8 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
+import android.widget.ListView
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,12 +24,19 @@ import androidx.lifecycle.lifecycleScope
 import com.example.csvmodifier.R
 import com.example.csvmodifier.databinding.ActivityOptionsBinding
 import com.example.csvmodifier.model.TimestampIncrementMode
+import com.example.csvmodifier.model.VeevaActionType
+import com.example.csvmodifier.model.VeevaApiUploader
 import com.example.csvmodifier.viewmodel.MainViewModel
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 
 class OptionsActivity : AppCompatActivity() {
 
@@ -37,6 +46,8 @@ class OptionsActivity : AppCompatActivity() {
 
     private var loadingDialog: Dialog? = null
     private var progressTextView: TextView? = null
+
+    private val veevaApiUploader = VeevaApiUploader()
 
     private val TAG = "OptionsActivity"
 
@@ -77,17 +88,14 @@ class OptionsActivity : AppCompatActivity() {
         setupUIListeners()
         setupObservers()
 
-        // Start on Step 1
         showStep1()
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        // Handle hardware/toolbar back press for Step 2
         if (binding.groupStep2.visibility == View.VISIBLE) {
             showStep1()
-            return false // We've handled it, don't close the activity
+            return false
         }
-        // If on Step 1, proceed with default back behavior (close activity)
         onBackPressedDispatcher.onBackPressed()
         return true
     }
@@ -121,21 +129,28 @@ class OptionsActivity : AppCompatActivity() {
     }
 
     private fun setupUIListeners() {
-        // Step 1 buttons
         binding.buttonSelectValueFromList.setOnClickListener { showValueFromListSelectionDialog() }
         binding.buttonSelectTargetColumns.setOnClickListener {
-            val disabledCols = (viewModel.selectedRandomizeColumns.value ?: emptySet()) + (viewModel.selectedUuidColumns.value ?: emptySet()) + (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet())
+            val disabledCols = (viewModel.selectedRandomizeColumns.value ?: emptySet()) +
+                    (viewModel.selectedUuidColumns.value ?: emptySet()) +
+                    (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet()) +
+                    (viewModel.selectedDeleteColumns.value ?: emptySet())
             showColumnSelectionDialog("Select Columns for Increment/Date", viewModel.selectedTargetColumns.value ?: emptySet(), disabledCols) { viewModel.updateSelectedTargetColumns(it) }
         }
         binding.buttonSelectRandomizeColumns.setOnClickListener {
-            val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) + (viewModel.selectedUuidColumns.value ?: emptySet()) + (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet())
+            val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) +
+                    (viewModel.selectedUuidColumns.value ?: emptySet()) +
+                    (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet()) +
+                    (viewModel.selectedDeleteColumns.value ?: emptySet())
             showColumnSelectionDialog("Select Columns to Randomize", viewModel.selectedRandomizeColumns.value ?: emptySet(), disabledCols) { viewModel.updateSelectedRandomizeColumns(it) }
         }
         binding.buttonSelectUuidColumns.setOnClickListener {
-            val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) + (viewModel.selectedRandomizeColumns.value ?: emptySet()) + (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet())
+            val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) +
+                    (viewModel.selectedRandomizeColumns.value ?: emptySet()) +
+                    (viewModel.selectedValueFromListColumns.value?.keys ?: emptySet()) +
+                    (viewModel.selectedDeleteColumns.value ?: emptySet())
             showColumnSelectionDialog("Select Columns for NEW UUIDs", viewModel.selectedUuidColumns.value ?: emptySet(), disabledCols) { viewModel.updateSelectedUuidColumns(it) }
         }
-        // NEW: Listener for delete columns button
         binding.buttonSelectDeleteColumns.setOnClickListener {
             val disabledCols = (viewModel.selectedTargetColumns.value ?: emptySet()) +
                     (viewModel.selectedRandomizeColumns.value ?: emptySet()) +
@@ -147,7 +162,6 @@ class OptionsActivity : AppCompatActivity() {
         binding.buttonClearSelections.setOnClickListener { viewModel.clearAllSelections(); Toast.makeText(this, "Selections cleared.", Toast.LENGTH_SHORT).show() }
         binding.buttonNext.setOnClickListener { showStep2() }
 
-        // Step 2 buttons
         binding.buttonBack.setOnClickListener { showStep1() }
         binding.buttonProcessAndSave.setOnClickListener {
             val suggestedName = viewModel.selectedFileName.value?.let { "processed_$it" } ?: "processed_output.csv"
@@ -156,6 +170,20 @@ class OptionsActivity : AppCompatActivity() {
         binding.buttonShare.setOnClickListener {
             viewModel.lastSavedFileUri.value?.let { uri -> shareFile(uri) } ?: Toast.makeText(this, "No saved file to share.", Toast.LENGTH_SHORT).show()
         }
+        binding.buttonLoadToVault.setOnClickListener {
+            binding.buttonLoadToVault.setOnClickListener {
+                // Launch the dedicated VeevaUploadActivity instead of showing a dialog
+                val savedFileUri = viewModel.lastSavedFileUri.value
+                if (savedFileUri != null) {
+                    val intent = Intent(this, VeevaUploadActivity::class.java).apply {
+                        putExtra(VeevaUploadActivity.EXTRA_FILE_URI, savedFileUri.toString())
+                    }
+                    startActivity(intent)
+                } else {
+                    Toast.makeText(this, "Please process and save a file first.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     private fun gatherOptionsAndProcess(sourceUri: Uri, destUri: Uri) {
@@ -163,25 +191,19 @@ class OptionsActivity : AppCompatActivity() {
         val dateIncrementStep = binding.editTextDateIncrementStep.text.toString().toLongOrNull() ?: 1L
         val numberIncrementStep = binding.editTextNumberIncrementStep.text.toString().toLongOrNull() ?: 1L
 
-        // UPDATED: Parse row range to delete
+        val generateFromFirstRowOnly = binding.switchFirstRowOnly.isChecked
+
         val rowsToDeleteStr = binding.editTextDeleteRows.text.toString()
-        val rowsToDeleteRange: IntRange? = if (rowsToDeleteStr.isBlank()) {
+        val rowsToDeleteRange: IntRange? = if (rowsToDeleteStr.isBlank() || generateFromFirstRowOnly) {
+            if(rowsToDeleteStr.isNotBlank()){ Toast.makeText(this, "Row deletion is disabled when 'Generate from first row only' is on.", Toast.LENGTH_LONG).show() }
             null
         } else {
             try {
                 val parts = rowsToDeleteStr.split("-").map { it.trim().toInt() }
-                if (parts.size == 2 && parts[0] <= parts[1]) {
-                    parts[0]..parts[1]
-                } else if (parts.size == 1) {
-                    parts[0]..parts[0] // Handle single number entry
-                } else {
-                    viewModel.setErrorMessage("Invalid row range. Use format 'start-end' or a single number.")
-                    return
-                }
-            } catch (e: NumberFormatException) {
-                viewModel.setErrorMessage("Invalid number in row range.")
-                return
-            }
+                if (parts.size == 2 && parts[0] <= parts[1]) { parts[0]..parts[1] }
+                else if (parts.size == 1) { parts[0]..parts[0] }
+                else { viewModel.setErrorMessage("Invalid row range. Use 'start-end' or a single number."); return }
+            } catch (e: NumberFormatException) { viewModel.setErrorMessage("Invalid number in row range."); return }
         }
 
         val incrCols = viewModel.selectedTargetColumns.value ?: emptySet()
@@ -190,9 +212,6 @@ class OptionsActivity : AppCompatActivity() {
         val listCols = viewModel.selectedValueFromListColumns.value ?: emptyMap()
         val deleteCols = viewModel.selectedDeleteColumns.value ?: emptySet()
 
-        // No need for empty check, as deletion is a valid standalone action
-
-        val generateFromFirstRowOnly = binding.switchFirstRowOnly.isChecked
         val timestampMode = when (binding.radioGroupTimestampMode.checkedRadioButtonId) {
             R.id.radioDayOnly -> TimestampIncrementMode.DAY_ONLY
             R.id.radioTimeOnly -> TimestampIncrementMode.TIME_ONLY

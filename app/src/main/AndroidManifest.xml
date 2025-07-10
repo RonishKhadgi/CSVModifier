@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- NEW: Permission to access the internet -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -25,7 +28,11 @@
             android:name=".view.OptionsActivity"
             android:exported="false" />
 
-        <!-- NEW: Declare the FileProvider for sharing files securely -->
+        <!-- NEW: Declare the VeevaUploadActivity -->
+        <activity
+            android:name=".view.VeevaUploadActivity"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
